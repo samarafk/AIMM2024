@@ -6,7 +6,7 @@ author:
   - Departamento de Estatística - IMECC - UNICAMP
 - name: Samara Kiihl
   affiliation: Departamento de Estatística - IMECC - UNICAMP
-date: "8 de Agosto de 2024"  
+date: "August 29th 2024"  
 output: 
   BiocStyle::html_document:
     toc: true
@@ -30,70 +30,102 @@ nocite: |
 knitr::opts_chunk$set(echo = TRUE, message = FALSE)
 ```
 
-# Introdução
+# Introduction
+
+This document is part of the tutorial presented during the Artificial Intelligence for Malaria (and Infectious Diseases) Modelling in Brazil and Latin America ([AIMM 2024](https://sally.ufba.br/AIMM2024.html)).
+
+Source files are available on <https://github.com/samarafk/AIMM2024>.
 
 
-Este material faz parte do tutorial apresentado no AIMM, realizado no IMECC, UNICAMP.
+# Dataset
 
-O código fonte deste material e o conjunto de dados estão disponíveis em <https://github.com/samarafk/AIMM2024>.
+The dataset used in this example is available from @Adeboye2020.
 
-
-# Conjunto de dados
-
-O conjunto de dados está disponível no site <https://www.r-causal.org/chapters/02-whole-game> e <https://evalsp21.classes.andrewheiss.com/example/matching-ipw/#program-background>
-
-Vamos carregar o pacote `tidyverse` e ler o conjunto de dados `net_data` que usaremos neste tutorial:
+We start by loading the `tidyverse` package and importing the dataset:
 
 ```{r}
 library(tidyverse)
-
-#load("net_data.rda")
-
-net_data <- read_csv("https://evalsp21.classes.andrewheiss.com/data/mosquito_nets.csv")
-
-abalone <- net_data %>% select(net, malaria_risk, income, health, household, eligible, temperature, resistance)
+malaria <- read_csv("https://ars.els-cdn.com/content/image/1-s2.0-S2352340919313526-mmc1.csv")
 ```
 
-Algumas informações rápidas dos dados:
+Quick information about the dataset:
 ```{r}
-abalone %>% glimpse()
+malaria %>% glimpse()
 ```
 
-Temos $n=`r nrow(abalone)`$ observações. A variável resposta é `malaria_risk`.
+We have $n=`r nrow(malaria)`$ observations. 
 
-As primeiras 10 observações:
+Let's quickly rename one of the variables:
+```{r}
+malaria <- malaria %>% rename(severe_malaria = severe_maleria)
+```
+
+
+The first 10 observations:
 
 ```{r}
-abalone %>% head(10)
+malaria %>% head(10)
+```
+
+The response variable is `severe_malaria`. `tidymodels` expects the outcome to be a factor and it also treats the first level as the event:
+
+```{r}
+malaria <- malaria %>% 
+  mutate(severe_malaria = factor(severe_malaria)) %>% 
+  mutate(severe_malaria = relevel(severe_malaria, ref = "1"))
 ```
 
 
 # Data Splitting
 
-Agora vamos carregar o pacote `tidymodels` e separar os dados em duas partes.
+We now load the `tidymodels` package to start our analysis. The first step is to split the data into training and testing datasets. 
 
-Para dividir os dados em conjuntos de treinamento e teste usamos a função `initial_split()`. Por padrão, a função separa 75\% dos dados para o treinamento e 25\% para o teste. Aqui, como exemplo, estamos usando 80\% para o treinamento e isso é especificado com `prop = 0.8`.
+We use the function `initial_split()`. By default, this function splits the data so that 75\% is training and 25\% is testing.  Here, we use 80\% for training, so we specify this by setting `prop = 0.8`. We need to use `set.seed()` here, since it allows us to reproduce the results.
+
+
+```{r}
+library(tidymodels)
+set.seed(1234)
+malaria_split <- initial_split(malaria, prop = 0.8, strata = severe_malaria)
+```
+
+The functions `training()` and `testing()` are used to extract the training and testing datasets, respectively:
+
+```{r}
+malaria_train <- training(malaria_split)
+malaria_test <- testing(malaria_split)
+```
+
+
+
+What is the distribution of the outcome for the training and testing datasets? 
+
+```{r}
+malaria_train %>% 
+  ggplot(aes(x = severe_malaria)) +
+  geom_bar()
+```
+
+Is the age distribution similar between the two malaria severity conditions?
+
+```{r}
+malaria_train %>% 
+  ggplot(aes(x = age, fill = severe_malaria, group = severe_malaria)) +
+  geom_density(position = "identity", alpha = .6)
+
+```
 
 A amostragem estratificada é feita através do argumento `strata`. A estratificação garante que os dados de teste mantenham uma distribuição próxima a dos dados de treinamento.
 
 Como a separação em treinamento e teste é feita de forma aleatorizada é importante usar `set.seed()` para garantirmos sempre a mesma divisão dos dados ao executarmos o código novamente:
 
-```{r}
-library(tidymodels)
-set.seed(1234)
-ring_split <- initial_split(abalone, prop = 0.8, strata = malaria_risk)
-```
 
-As funções training() e testing() são usadas para extrair os conjuntos de treinamento e teste, respectivamente:
-```{r}
-ring_train <- training(ring_split)
-ring_test <- testing(ring_split)
-```
+
 
 Mais detalhes sobre divisão do conjunto de dados em treinamento e teste são discutidos nos livros de @hastie01statisticallearning e @James2013.
 
 
-# Modelo
+# Model
 
 No `tidymodels`, temos alguns passos para especificar um modelo:
 
@@ -102,33 +134,32 @@ No `tidymodels`, temos alguns passos para especificar um modelo:
 3) Defina o modo (*mode*)
 
 
-Por exemplo, se quisermos especificar um modelo de regressão linear:
+Por exemplo, se quisermos especificar um modelo de regressão logística:
 
 ```{r}
-linear_reg()
+logistic_reg()
 ```
 
 
 Depois que a forma funcional do modelo é especificada, é necessário pensar em um mecanismo/método para ajustar ou treinar o modelo, chamado de *engine*.
 
 ```{r}
-args(linear_reg)
+args(logistic_reg)
 ```
 
 
-Veja que o método *default* para `linear_reg()` é `lm`, que ajusta o modelo por mínimos quadrados ordinários, mas é possível escolher outros métodos.
+Veja que o método *default* para `logistic_reg()` é `glm` (generalized linear models), mas é possível escolher outros métodos.
 
-Por exemplo, um modelo de regressão linear via mínimos quadrados generalizados:
-
+Por exemplo, um modelo de regressão logística via lasso and elastic-net regularized generalized linear models:
 ```{r}
-linear_reg() %>% 
-   set_engine("gls") 
+logistic_reg() %>% 
+   set_engine("glmnet") 
 ```
 
 Todos os modelos disponíveis são listados no site: <https://www.tidymodels.org/find/parsnip/>
 
 
-# Receitas
+# Recipes
 
 Antes de proceder para o ajuste/treinamento do modelo, faz-se o pré-processamento dos dados, já que:
 
@@ -141,13 +172,13 @@ Para isso, o `tidymodels` usa o que é chamado de receita (`recipe`).
 Uma primeira receita: 
 
 ```{r}
-ring_rec <- recipe(malaria_risk ~ ., data = ring_train)
+malaria_rec <- recipe(severe_malaria ~ ., data = malaria_train)
 ```
 
 No exemplo acima, a função `recipe()` apenas define a variável resposta e os preditores através da fórmula.
 
 ```{r}
-ring_rec %>% summary()
+malaria_rec %>% summary()
 ```
 
 
@@ -162,11 +193,8 @@ Os passos de pré-processamento de uma receita usam os dados de treinamento para
 Um outro exemplo de receita:
 
 ```{r}
-ring_rec <- recipe(malaria_risk ~ ., data = ring_train) %>%
-  step_normalize(all_numeric_predictors()) %>%
-  step_corr(all_numeric_predictors(), threshold = 0.9) %>%
-  step_dummy(all_nominal_predictors()) %>%
-  step_poly(temperature, degree = 2)
+malaria_rec <- recipe(severe_malaria ~ ., data = malaria_train) %>%
+  step_poly(age, degree = 2)
 ```
 
 
@@ -177,12 +205,12 @@ kable_recipe <- function(rec) {
     prep() %>%
     juice() %>%
     head(10) %>%
-    select(malaria_risk, everything()) %>%
+    select(severe_malaria, everything()) %>%
     kableExtra::kable(booktabs = TRUE, digits = 3, linesep = "") %>%
     kableExtra::kable_styling(font_size = 8)
 }
 
-kable_recipe(ring_rec)
+kable_recipe(malaria_rec)
 ```
 
 
@@ -196,41 +224,46 @@ Para isso, o `tidymodels` propõe o uso da função `workflow()`, que possui doi
 * `spec`: modelo especificado com `parsnip`
 
 
-Vamos especificar um modelo de regressão linear:
+Vamos especificar um modelo de regressão logística:
 
 ```{r}
-reg_spec <- linear_reg() %>%
-  set_engine("lm") %>%
-  set_mode("regression")
+reg_spec <- logistic_reg() %>%
+  set_engine("glm", family = "binomial") %>%
+  set_mode("classification")
 ```
 
-A receita a ser aplicada está no objeto `ring_rec`.
+A receita a ser aplicada está no objeto `malaria_rec`.
 
 Vamos agregar essas duas informações no *workflow*:
 
 ```{r}
-reg_wf <- workflow(ring_rec, reg_spec)
+reg_wf <- workflow(malaria_rec, reg_spec)
 ```
 
 A função `fit()` pode ser usada para ajustar o modelo usando os dados de treinamento:
 
 ```{r}
-reg_fit <- reg_wf %>% fit(data = ring_train)
+reg_fit <- reg_wf %>% fit(data = malaria_train)
 reg_fit
 ```
 
 
-A função `tidy()` do pacote `broom` resume as informações mais importantes de um modelo usando o conceito tidy:
+A função `tidy()` do pacote `broom` resume as informações mais importantes de um modelo usando o conceito *tidy*:
 
 ```{r}
 reg_fit %>% tidy(conf.int = TRUE)
 ```
 
 
+
+```{r}
+reg_fit %>% tidy(conf.int = TRUE, exponentiate = TRUE)
+```
+
 A função `predict()` calcula os valores preditos para o conjunto especificado:
 
 ```{r}
-reg_fit %>% predict(ring_train)
+reg_fit %>% predict(malaria_train)
 ```
 
 
@@ -243,14 +276,9 @@ A predição com `tidymodels` garante que:
 Pode-se usar também a função `augment()`, que calcula os valores preditos e resíduos, adicionando-os em uma coluna no conjunto de dados especificado:
 
 ```{r}
-reg_fit %>% augment(ring_train)
+reg_fit %>% augment(malaria_train)
 ```
 
-Para visualizar as estimativas dos parâmetros do modelo ajustado:
-```{r}
-reg_fit %>% tidy()
-```
-  
   
   
 # Avaliar e comparar modelos
@@ -267,7 +295,7 @@ Olhar os resultados para cada observação não é produtivo:
 
 ```{r}
 reg_fit %>%
-  augment(ring_train) %>% 
+  augment(malaria_train) %>% 
   head()
 ```
 
@@ -285,29 +313,39 @@ Dentro de `tidymodels` temos a função `metrics()` do pacote `yardstick` para a
 
 ```{r}
 reg_fit %>%
-  augment(new_data = ring_train) %>%
-  metrics(malaria_risk, .pred)
+  augment(new_data = malaria_train) %>%
+  metrics(truth = severe_malaria, estimate = .pred_class)
 ```
 
 Podemos especificar apenas uma métrica:
 
 ```{r}
 reg_fit %>%
-  augment(new_data = ring_train) %>%
-  rmse(malaria_risk, .pred)
+  augment(new_data = malaria_train) %>%
+  accuracy(truth = severe_malaria, estimate = .pred_class)
 ```
+
+
+We can look at the resulting confusion matrix:
+
+```{r}
+reg_fit %>%
+  augment(new_data = malaria_train) %>%
+  conf_mat(truth = severe_malaria, estimate = .pred_class)
+```
+
 
 Também é possível especificar um conjunto de métricas. No exemplo a seguir, `abalone_metrics` é definido como um conjunto de quatro métricas: RMSE, MAE, MAPE e $R^2$:
 
 ```{r}
-abalone_metrics <- metric_set(rmse, mae, mape, rsq)
+malaria_metrics <- metric_set(accuracy, sensitivity, specificity)
 ```
 
 E podemos avaliar este conjunto de métricas no modelo ajustado: 
 
 ```{r}
-augment(reg_fit, new_data = ring_train) %>%
-  abalone_metrics(malaria_risk, .pred)
+augment(reg_fit, new_data = malaria_train) %>%
+  malaria_metrics(truth = severe_malaria, estimate = .pred_class)
 ```
 
 
@@ -318,20 +356,24 @@ Ao calcularmos as métricas tanto no conjunto de treinamento quanto no de teste,
 ::: {.column width="50%"}
 ```{r}
 reg_fit %>%
-  augment(ring_train) %>%
-  metrics(malaria_risk, .pred)
+  augment(malaria_train) %>%
+  metrics(truth = severe_malaria, estimate = .pred_class)
 ```
 :::
 
 ::: {.column width="50%"}
 ```{r}
 reg_fit %>%
-  augment(ring_test) %>%
-  metrics(malaria_risk, .pred)
+  augment(malaria_test) %>%
+  metrics(truth = severe_malaria, estimate = .pred_class)
 ```
 :::
 :::
 
+
+ROC CURVES
+
+https://workshops.tidymodels.org/slides/intro-04-evaluating-models.html#/roc-curves-2
 
 ## Validação cruzada
 
@@ -339,15 +381,15 @@ Usaremos como exemplo 5 *folds*. Para fazer a reamostragem nos dados de treiname
 
 ```{r}
 set.seed(234)
-ring_folds <- ring_train %>%
-                vfold_cv(v = 5, strata = malaria_risk)
-ring_folds
+malaria_folds <- malaria_train %>%
+                vfold_cv(v = 5, strata = severe_malaria)
+malaria_folds
 ```
 
 Ajustando o modelo nas reamostras:
 
 ```{r}
-reg_cv <- reg_wf %>% fit_resamples(ring_folds)
+reg_cv <- reg_wf %>% fit_resamples(malaria_folds)
 reg_cv
 ```
 
@@ -362,8 +404,8 @@ Para calcular um conjunto escolhido de métricas, é preciso especificar o conju
 
 ```{r}
 reg_cv <- fit_resamples(reg_wf, 
-                 ring_folds,
-                 metrics = abalone_metrics)
+                 malaria_folds,
+                 metrics = malaria_metrics)
 
 reg_cv %>%
   collect_metrics()
@@ -379,7 +421,7 @@ Caso seja necessário salvar as predições obtidas nas etapas de validação cr
 ```{r}
 ctrl_abalone <- control_resamples(save_pred = TRUE)
 reg_cv <- fit_resamples(reg_wf, 
-               ring_folds, 
+               malaria_folds, 
                control = ctrl_abalone)
 reg_preds <- collect_predictions(reg_cv)
 reg_preds
@@ -391,7 +433,7 @@ Podemos fazer um gráfico de preditos versus observados, separados por cada *fol
 ```{r,echo=TRUE, warning=FALSE}
 #| fig-align: center
 reg_preds %>% 
-  ggplot(aes(malaria_risk, .pred, color = id)) + 
+  ggplot(aes(severe_malaria, .pred, color = id)) + 
   geom_abline(lty = 2, col = "gray", size = 1.5) +
   geom_point(alpha = 0.5) +
   coord_obs_pred()
@@ -411,21 +453,21 @@ Um outro modelo a ser considerado é árvore de decisão. Vamos considerar o seg
 O modelo de árvore de regressão não requer pré-processamento, de forma que podemos usar um workflow com a fórmula e o modelo especificado, por exemplo:
 
 ```{r}
-tree_wf <- workflow(malaria_risk ~ ., tree_spec)
+tree_wf <- workflow(severe_malaria ~ ., tree_spec)
 tree_wf
 ```
 
 E o ajuste é com os dados de treinamento:
 
 ```{r}
-tree_fit <- tree_wf %>% fit(data = ring_train)
+tree_fit <- tree_wf %>% fit(data = malaria_train)
 ```  
 
 
 Vamos então avaliar o desempenho da árvore de decisão usando validação cruzada:
 
 ```{r}
-tree_cv <- tree_wf %>% fit_resamples(ring_folds)
+tree_cv <- tree_wf %>% fit_resamples(malaria_folds)
   
 tree_cv %>% collect_metrics()
 ```  
@@ -443,7 +485,7 @@ Para isso, existe a função `workflow_set()` que gera um conjunto de workflows.
  
  
 ```{r}
-wf_set <- workflow_set(preproc = list(rec1 = malaria_risk ~ ., rec2 = ring_rec),
+wf_set <- workflow_set(preproc = list(rec1 = severe_malaria ~ ., rec2 = malaria_rec),
                        models = list(tree = tree_spec, reg = reg_spec),
                        cross = FALSE)
 ```
@@ -454,7 +496,7 @@ Agora podemos avaliar os modelos com as métricas desejadas usando a validação
 
 ```{r}
 wf_set %>%
-  workflow_map("fit_resamples", resamples = ring_folds) %>%
+  workflow_map("fit_resamples", resamples = malaria_folds) %>%
   rank_results()
 ```
 
@@ -462,17 +504,17 @@ E para focarmos apenas nos melhores resultados:
 
 ```{r}
 wf_set %>%
-  workflow_map("fit_resamples", resamples = ring_folds) %>%
+  workflow_map("fit_resamples", resamples = malaria_folds) %>%
   rank_results()
 ```  
 
 Se o argumento `cross = TRUE` o `workflow_set` faz um produto cruzado das receitas e modelos:
 
 ```{r}
-workflow_set(preproc = list(rec1 = malaria_risk ~ ., rec2 = ring_rec),
+workflow_set(preproc = list(rec1 = severe_malaria ~ ., rec2 = malaria_rec),
              models = list(tree = tree_spec, reg = reg_spec),
              cross = TRUE) %>%
-  workflow_map("fit_resamples", resamples = ring_folds) %>%
+  workflow_map("fit_resamples", resamples = malaria_folds) %>%
   rank_results()
 ```  
 
@@ -483,10 +525,10 @@ Vamos ajustar o modelo nos dados de treinamento e verificar o desempenho nos dad
 Vimos os comandos `fit()` e `predict()`/`augment()`, mas podemos usar a função `final_fit()`, que combina esses passos.
 
 ```{r}
-final_fit <- last_fit(reg_wf, ring_split) 
+final_fit <- last_fit(reg_wf, malaria_split) 
 ```
 
-Lembre-se que o objeto `ring_split` tem informações sobre a separação dados originais em treino e teste.
+Lembre-se que o objeto `malaria_split` tem informações sobre a separação dados originais em treino e teste.
 
 ```{r}
 final_fit
@@ -510,7 +552,7 @@ collect_predictions(final_fit) %>%
 ```{r,echo=TRUE}
 #| fig-align: center
 collect_predictions(final_fit) %>%
-  ggplot(aes(malaria_risk, .pred)) + 
+  ggplot(aes(severe_malaria, .pred)) + 
   geom_abline(lty = 2, col = "deeppink4", size = 1.5) +
   geom_point(alpha = 0.5) +
   coord_obs_pred()
@@ -550,10 +592,10 @@ Para um modelo de regressão linear em que uma das variáveis será considerada 
 
 ```{r}
 #| code-line-numbers: "4"
-ring_rec <-
-  recipe(malaria_risk ~ ., data = ring_train) %>%
+malaria_rec <-
+  recipe(severe_malaria ~ ., data = malaria_train) %>%
   step_dummy(all_nominal_predictors()) %>%
-  step_poly(temperature, degree = tune())
+  step_poly(age, degree = tune())
 ```
 
 Repare que, acima, não especificamos diretamente o grau do polinômio. Vamos escolher o melhor hiperparâmetro usando a função `tune()`.
@@ -562,7 +604,7 @@ Com a receita definida, vamos agregar as informações:
 
 
 ```{r}
-regpol_wf <- workflow(ring_rec, linear_reg())
+regpol_wf <- workflow(malaria_rec, linear_reg())
 regpol_wf
 ```
 
@@ -570,7 +612,7 @@ A função `tune_grid()` calcula um conjunto de métricas usando validação cru
 
 ```{r}
 set.seed(123)
-regpol_res <- tune_grid(regpol_wf, ring_folds, grid = tibble(degree=1:6))
+regpol_res <- tune_grid(regpol_wf, malaria_folds, grid = tibble(degree=1:6))
 regpol_res
 ```
 
@@ -585,12 +627,12 @@ Visualização gráfica usando `autoplot()`:
 
 ```{r}
 #| fig-align: 'center'
-autoplot(regpol_res, metric = "rmse")
+autoplot(regpol_res, metric = "accuracy")
 ```
 
 Mostrando os melhores resultados:
 ```{r}
-show_best(regpol_res, metric = "rmse", n = 3)
+show_best(regpol_res, metric = "accuracy", n = 3)
 ```
 
 
@@ -607,14 +649,14 @@ tree_spec <-
   decision_tree(
     cost_complexity = tune()
   ) %>%
-  set_mode("regression") %>% 
+  set_mode("classification") %>% 
   set_engine("rpart")
 ```
 
 A receita é definida:
 ```{r}
 tree_rec <- 
-  recipe(malaria_risk ~ ., data = ring_train) %>%
+  recipe(severe_malaria ~ ., data = malaria_train) %>%
   step_dummy(all_nominal_predictors())
 ```
 
@@ -630,7 +672,7 @@ Vamos usar `tune_grid()` para avaliar vários valores para o hiperparâmwtro:
 set.seed(9)
 tree_res <-
   tune_grid(tree_wf, 
-            resamples = ring_folds, 
+            resamples = malaria_folds, 
             grid = 15,
             metrics = abalone_metrics)
 ```
@@ -647,7 +689,7 @@ Em resumo, o melhor resultado para regressão polinomial, segundo a validação 
 
 ```{r}
 regpol_res %>% 
-  show_best(metric = "rmse", n = 1) %>% 
+  show_best(metric = "accuracy", n = 1) %>% 
   select(.metric, .estimator, mean, n, std_err, .config)
 ```
 
@@ -656,14 +698,14 @@ E melhor resultado para regressão polinomial, segundo a validação cruzada:
 
 ```{r xgboost-best}
 tree_res %>% 
-  show_best(metric = "rmse", n = 1) %>% 
+  show_best(metric = "accuracy", n = 1) %>% 
   select(.metric, .estimator, mean, n, std_err, .config)
 ```
 
 Entre as duas opções (regressão polinomial e árvore), vamos ficar com a regressão polinomial. Vamos selecionar o modelo com hiperparâmtro de melhor desempenho: 
 
 ```{r}
-best_rmse <- select_best(regpol_res, metric = "rmse")
+best_rmse <- select_best(regpol_res, metric = "accuracy")
 best_rmse
 ```
 
@@ -674,7 +716,7 @@ E ajustando o modelo final:
 final_res <-
   regpol_wf %>% 
   finalize_workflow(best_rmse) %>%
-  last_fit(ring_split)
+  last_fit(malaria_split)
 final_res
 ```
 
@@ -698,7 +740,7 @@ fitted_wf
 
 Obter valores preditos:
 ```{r}
-predict(fitted_wf, ring_test[1:3,])
+predict(fitted_wf, malaria_test[1:3,])
 ```
 
 *Workflow* final:
