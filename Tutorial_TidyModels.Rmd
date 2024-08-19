@@ -126,55 +126,54 @@ Mais detalhes sobre divisão do conjunto de dados em treinamento e teste são di
 
 # Model
 
-No `tidymodels`, temos alguns passos para especificar um modelo:
+We have the following steps when using `tidymodels` to specify a model:
 
-1) Escolha um modelo (*model*)
-2) Especifique um mecanismo (*engine*)
-3) Defina o modo (*mode*)
+1) Choose a *model*
+2) Specify and *engine*
+3) Set the *mode*
 
 
-Por exemplo, se quisermos especificar um modelo de regressão logística:
+For instance, if we want to specify a logistic regression model, we use:
 
 ```{r}
 logistic_reg()
 ```
-
-
-Depois que a forma funcional do modelo é especificada, é necessário pensar em um mecanismo/método para ajustar ou treinar o modelo, chamado de *engine*.
+After specifying the funcional form of the model, we need to choose the engine:
 
 ```{r}
 args(logistic_reg)
 ```
 
 
-Veja que o método *default* para `logistic_reg()` é `glm` (generalized linear models), mas é possível escolher outros métodos.
+Here we see that the *default* for `logistic_reg()` is `glm` (generalized linear models), but other models are also available.
 
-Por exemplo, um modelo de regressão logística via lasso and elastic-net regularized generalized linear models:
+
+Is we want a logistic regression model via lasso and elastic-net regularized generalized linear models:
 ```{r}
 logistic_reg() %>% 
    set_engine("glmnet") 
 ```
 
-Todos os modelos disponíveis são listados no site: <https://www.tidymodels.org/find/parsnip/>
+All available models are listed in the website: <https://www.tidymodels.org/find/parsnip/>
 
 
 # Recipes
 
-Antes de proceder para o ajuste/treinamento do modelo, faz-se o pré-processamento dos dados, já que:
+Before proceeding to adjust/train the model, the data is pre-processed:
 
-- Alguns **modelos** exigem que os preditores tenham certas características ou certos formatos.
+- Some **models** require predictors to have certain characteristics or certain formats.
 
-- Algumas **variáveis** requerem algum tipo de transformação.
+- Some **variables** require some type of transformation.
 
-Para isso, o `tidymodels` usa o que é chamado de receita (`recipe`).
+To do this, `tidymodels` uses what is called a recipe (`recipe`).
 
-Uma primeira receita: 
+First simple recipe:
 
 ```{r}
 malaria_rec <- recipe(severity ~ ., data = malaria_train)
 ```
 
-No exemplo acima, a função `recipe()` apenas define a variável resposta e os preditores através da fórmula.
+In the example above, the `recipe()` function defines the response variable and the predictors through the formula.
 
 ```{r}
 malaria_rec %>% summary()
@@ -183,13 +182,15 @@ malaria_rec %>% summary()
 
 
 
-Os passos de pré-processamento de uma receita usam os dados de treinamento para os cálculos. Tipos de cálculos no processamento:
-* Níveis de uma variável categórica
-* Avaliar se uma coluna tem variância nula (constante) - `step_zv()`
-* Calcular média e desvio-padrão para a normalização
-* Projetar os novos dados nas componentes principais obtidas pelos dados de treinamento.
+The preprocessing steps of a recipe use the training data for calculations. Types of calculations in processing:
 
-Um outro exemplo de receita:
+
+* Levels of a categorical variable
+* Evaluate whether a column has zero (constant) variance - `step_zv()`
+* Calculate mean and standard deviation for normalization
+* Transform the new data onto the principal components obtained by the training data.
+
+Another recipe example:
 
 ```{r}
 malaria_rec <- recipe(severity ~ ., data = malaria_train) %>%
@@ -197,7 +198,7 @@ malaria_rec <- recipe(severity ~ ., data = malaria_train) %>%
 ```
 
 
-A tabela a seguir apresenta os dados pré-processamos segundo a receita acima:
+The following table presents the data pre-processed according to the recipe above:
 ```{r, echo=FALSE}
 kable_recipe <- function(rec) {
   rec %>%
@@ -215,67 +216,67 @@ kable_recipe(malaria_rec)
 
 # Workflow
 
-Gerenciar um modelo especificado com o `parsnip` (`model` + `engine` + `mode`) e os passos de pré-processamento usando `recipes`, pode ser um desafio.
+Managing a model specified with `parsnip` (`model` + `engine` + `mode`) and preprocessing steps using `recipes` can be challenging.
 
-Para isso, o `tidymodels` propõe o uso da função `workflow()`, que possui dois argumentos opcionais:
+To do this, `tidymodels` proposes the use of the `workflow()` function, which has two optional arguments:
 
-* `preprocessor`: pode ser uma fórmula ou uma receita
-* `spec`: modelo especificado com `parsnip`
+* `preprocessor`: can be a formula or a recipe
+* `spec`: model specified with `parsnip`
 
 
-Vamos especificar um modelo de regressão logística:
+Let's specify a logistic regression model:
 
 ```{r}
-reg_spec <- logistic_reg() %>%
+logreg_spec <- logistic_reg() %>%
   set_engine("glm", family = "binomial") %>%
   set_mode("classification")
 ```
 
-A receita a ser aplicada está no objeto `malaria_rec`.
+The recipe to be applied is in the `malaria_rec` object.
 
-Vamos agregar essas duas informações no *workflow*:
+Let's add these two pieces of information to the *workflow*:
 
 ```{r}
-reg_wf <- workflow(malaria_rec, reg_spec)
+logreg_wf <- workflow(malaria_rec, logreg_spec)
 ```
 
-A função `fit()` pode ser usada para ajustar o modelo usando os dados de treinamento:
+The `fit()` function can be used to fit the model using the training data:
 
 ```{r}
-reg_fit <- reg_wf %>% fit(data = malaria_train)
-reg_fit
-```
-
-
-A função `tidy()` do pacote `broom` resume as informações mais importantes de um modelo usando o conceito *tidy*:
-
-```{r}
-reg_fit %>% tidy(conf.int = TRUE)
+logreg_fit <- logreg_wf %>% fit(data = malaria_train)
+logreg_fit
 ```
 
 
+The `tidy()` function from the `broom` package summarizes the most important information of a model using the *tidy* concept:
 
 ```{r}
-reg_fit %>% tidy(conf.int = TRUE, exponentiate = TRUE)
-```
-
-A função `predict()` calcula os valores preditos para o conjunto especificado:
-
-```{r}
-reg_fit %>% predict(malaria_train)
+logreg_fit %>% tidy(conf.int = TRUE)
 ```
 
 
-A predição com `tidymodels` garante que:
-
-- as predições estarão sempre dentro de um dataframe/tibble;
-- os nomes e tipos das colunas são previsíveis e intuitivas;
-- o número de linhas em new_data e a saída são iguais.
-
-Pode-se usar também a função `augment()`, que calcula os valores preditos e resíduos, adicionando-os em uma coluna no conjunto de dados especificado:
 
 ```{r}
-reg_fit %>% augment(malaria_train)
+logreg_fit %>% tidy(conf.int = TRUE, exponentiate = TRUE)
+```
+
+The `predict()` function calculates the predicted values for the specified dataset:
+
+```{r}
+logreg_fit %>% predict(malaria_train)
+```
+
+
+Prediction with `tidymodels` ensures that:
+
+- predictions will always be within a dataframe/tibble;
+- column names and types are predictable and intuitive;
+- the number of lines in `new_data` and the output are the same.
+
+You can also use the `augment()` function, which calculates the predicted values ​​and residuals, adding them into a column in the specified data set:
+
+```{r}
+logreg_fit %>% augment(malaria_train)
 ```
 
   
@@ -293,7 +294,7 @@ Como avaliar se o modelo tem bom desempenho (foco em predição)?
 Olhar os resultados para cada observação não é produtivo:
 
 ```{r}
-reg_fit %>%
+logreg_fit %>%
   augment(malaria_train) %>% 
   head()
 ```
@@ -311,7 +312,7 @@ Dentro de `tidymodels` temos a função `metrics()` do pacote `yardstick` para a
 * `estimate`: nome da variável contendo os valores preditos
 
 ```{r}
-reg_fit %>%
+logreg_fit %>%
   augment(new_data = malaria_train) %>%
   metrics(truth = severity, estimate = .pred_class)
 ```
@@ -319,7 +320,7 @@ reg_fit %>%
 Podemos especificar apenas uma métrica:
 
 ```{r}
-reg_fit %>%
+logreg_fit %>%
   augment(new_data = malaria_train) %>%
   accuracy(truth = severity, estimate = .pred_class)
 ```
@@ -328,7 +329,7 @@ reg_fit %>%
 We can look at the resulting confusion matrix:
 
 ```{r}
-reg_fit %>%
+logreg_fit %>%
   augment(new_data = malaria_train) %>%
   conf_mat(truth = severity, estimate = .pred_class)
 ```
@@ -343,7 +344,7 @@ malaria_metrics <- metric_set(accuracy, sensitivity, specificity)
 E podemos avaliar este conjunto de métricas no modelo ajustado: 
 
 ```{r}
-augment(reg_fit, new_data = malaria_train) %>%
+augment(logreg_fit, new_data = malaria_train) %>%
   malaria_metrics(truth = severity, estimate = .pred_class)
 ```
 
@@ -354,7 +355,7 @@ Ao calcularmos as métricas tanto no conjunto de treinamento quanto no de teste,
 ::: columns
 ::: {.column width="50%"}
 ```{r}
-reg_fit %>%
+logreg_fit %>%
   augment(malaria_train) %>%
   metrics(truth = severity, estimate = .pred_class)
 ```
@@ -362,7 +363,7 @@ reg_fit %>%
 
 ::: {.column width="50%"}
 ```{r}
-reg_fit %>%
+logreg_fit %>%
   augment(malaria_test) %>%
   metrics(truth = severity, estimate = .pred_class)
 ```
@@ -388,25 +389,25 @@ malaria_folds
 Ajustando o modelo nas reamostras:
 
 ```{r}
-reg_cv <- reg_wf %>% fit_resamples(malaria_folds)
-reg_cv
+logreg_cv <- logreg_wf %>% fit_resamples(malaria_folds)
+logreg_cv
 ```
 
 A função `collect_metrics()` extrai as métricas obtidas em cada reamostra e calcula a métrica da validação, geralmente através de uma média:
 
 ```{r}
-reg_cv %>%
+logreg_cv %>%
   collect_metrics()
 ```
 
 Para calcular um conjunto escolhido de métricas, é preciso especificar o conjunto no argumento `metrics` dentro de `fit_resamples`:
 
 ```{r}
-reg_cv <- fit_resamples(reg_wf, 
+logreg_cv <- fit_resamples(logreg_wf, 
                  malaria_folds,
                  metrics = malaria_metrics)
 
-reg_cv %>%
+logreg_cv %>%
   collect_metrics()
 ```
 
@@ -418,12 +419,12 @@ A métrica obtida no conjunto de validação pode ser tomada como uma estimativa
 Caso seja necessário salvar as predições obtidas nas etapas de validação cruzada, para fazer um gráfico, por exemplo, usamos `control_resamples`:
 
 ```{r}
-ctrl_abalone <- control_resamples(save_pred = TRUE)
-reg_cv <- fit_resamples(reg_wf, 
+ctrl_malaria <- control_resamples(save_pred = TRUE)
+logreg_cv <- fit_resamples(logreg_wf, 
                malaria_folds, 
-               control = ctrl_abalone)
-reg_preds <- collect_predictions(reg_cv)
-reg_preds
+               control = ctrl_malaria)
+logreg_preds <- collect_predictions(logreg_cv)
+logreg_preds
 ```
 
 
@@ -475,7 +476,7 @@ Para isso, existe a função `workflow_set()` que gera um conjunto de workflows.
  
 ```{r}
 wf_set <- workflow_set(preproc = list(rec1 = severity ~ ., rec2 = malaria_rec),
-                       models = list(tree = tree_spec, reg = reg_spec),
+                       models = list(tree = tree_spec, reg = logreg_spec),
                        cross = FALSE)
 ```
 
@@ -501,7 +502,7 @@ Se o argumento `cross = TRUE` o `workflow_set` faz um produto cruzado das receit
 
 ```{r}
 workflow_set(preproc = list(rec1 = severity ~ ., rec2 = malaria_rec),
-             models = list(tree = tree_spec, reg = reg_spec),
+             models = list(tree = tree_spec, reg = logreg_spec),
              cross = TRUE) %>%
   workflow_map("fit_resamples", resamples = malaria_folds) %>%
   rank_results()
@@ -514,7 +515,7 @@ Vamos ajustar o modelo nos dados de treinamento e verificar o desempenho nos dad
 Vimos os comandos `fit()` e `predict()`/`augment()`, mas podemos usar a função `final_fit()`, que combina esses passos.
 
 ```{r}
-final_fit <- last_fit(reg_wf, malaria_split) 
+final_fit <- last_fit(logreg_wf, malaria_split) 
 ```
 
 Lembre-se que o objeto `malaria_split` tem informações sobre a separação dados originais em treino e teste.
@@ -583,35 +584,35 @@ Com a receita definida, vamos agregar as informações:
 
 
 ```{r}
-regpol_wf <- workflow(malaria_rec, logistic_reg())
-regpol_wf
+logregpol_wf <- workflow(malaria_rec, logistic_reg())
+logregpol_wf
 ```
 
 A função `tune_grid()` calcula um conjunto de métricas usando validação cruzada para avaliar o desempenho em um conjunto pré-determinado de hiperparâmetros de um modelo ou de uma receita:
 
 ```{r}
 set.seed(123)
-regpol_res <- tune_grid(regpol_wf, malaria_folds, grid = tibble(degree=1:6))
-regpol_res
+logregpol_res <- tune_grid(logregpol_wf, malaria_folds, grid = tibble(degree=1:6))
+logregpol_res
 ```
 
 Apresentando os resultados (média dos 5 *folds*) para cada grau de polinômio (hiperparâmetro) considerado:
 
 
 ```{r}
-collect_metrics(regpol_res)
+collect_metrics(logregpol_res)
 ```
 
 Visualização gráfica usando `autoplot()`:
 
 ```{r}
 #| fig-align: 'center'
-autoplot(regpol_res, metric = "accuracy")
+autoplot(logregpol_res, metric = "accuracy")
 ```
 
 Mostrando os melhores resultados:
 ```{r}
-show_best(regpol_res, metric = "accuracy", n = 3)
+show_best(logregpol_res, metric = "accuracy", n = 3)
 ```
 
 
@@ -667,7 +668,7 @@ tree_res %>% collect_metrics()
 Em resumo, o melhor resultado para regressão polinomial, segundo a validação cruzada:
 
 ```{r}
-regpol_res %>% 
+logregpol_res %>% 
   show_best(metric = "accuracy", n = 1) %>% 
   select(.metric, .estimator, mean, n, std_err, .config)
 ```
@@ -684,7 +685,7 @@ tree_res %>%
 Entre as duas opções (regressão polinomial e árvore), vamos ficar com a regressão polinomial. Vamos selecionar o modelo com hiperparâmtro de melhor desempenho: 
 
 ```{r}
-best_rmse <- select_best(regpol_res, metric = "accuracy")
+best_rmse <- select_best(logregpol_res, metric = "accuracy")
 best_rmse
 ```
 
@@ -693,7 +694,7 @@ E ajustando o modelo final:
 
 ```{r}
 final_res <-
-  regpol_wf %>% 
+  logregpol_wf %>% 
   finalize_workflow(best_rmse) %>%
   last_fit(malaria_split)
 final_res
@@ -731,5 +732,5 @@ final_res %>%
   tidy()
 ```
 
-# Referências
+# References
 
