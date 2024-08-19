@@ -20,7 +20,6 @@ vignette: >
   %\VignetteEncoding{UTF-8}  
 bibliography: refs.bib
 nocite: | 
-  @misc_abalone_1
   @James2013
   @hastie01statisticallearning
   @kuhn2022tidy
@@ -57,7 +56,7 @@ We have $n=`r nrow(malaria)`$ observations.
 
 Let's quickly rename one of the variables:
 ```{r}
-malaria <- malaria %>% rename(severe_malaria = severe_maleria)
+malaria <- malaria %>% rename(severity = severe_maleria)
 ```
 
 
@@ -67,12 +66,12 @@ The first 10 observations:
 malaria %>% head(10)
 ```
 
-The response variable is `severe_malaria`. `tidymodels` expects the outcome to be a factor and it also treats the first level as the event:
+The response variable is `severity`. `tidymodels` expects the outcome to be a factor and it also treats the first level as the event:
 
 ```{r}
 malaria <- malaria %>% 
-  mutate(severe_malaria = factor(severe_malaria)) %>% 
-  mutate(severe_malaria = relevel(severe_malaria, ref = "1"))
+  mutate(severity = factor(severity)) %>% 
+  mutate(severity = relevel(severity, ref = "1"))
 ```
 
 
@@ -86,7 +85,7 @@ We use the function `initial_split()`. By default, this function splits the data
 ```{r}
 library(tidymodels)
 set.seed(1234)
-malaria_split <- initial_split(malaria, prop = 0.8, strata = severe_malaria)
+malaria_split <- initial_split(malaria, prop = 0.8, strata = severity)
 ```
 
 The functions `training()` and `testing()` are used to extract the training and testing datasets, respectively:
@@ -102,7 +101,7 @@ What is the distribution of the outcome for the training and testing datasets?
 
 ```{r}
 malaria_train %>% 
-  ggplot(aes(x = severe_malaria)) +
+  ggplot(aes(x = severity)) +
   geom_bar()
 ```
 
@@ -110,7 +109,7 @@ Is the age distribution similar between the two malaria severity conditions?
 
 ```{r}
 malaria_train %>% 
-  ggplot(aes(x = age, fill = severe_malaria, group = severe_malaria)) +
+  ggplot(aes(x = age, fill = severity, group = severity)) +
   geom_density(position = "identity", alpha = .6)
 
 ```
@@ -172,7 +171,7 @@ Para isso, o `tidymodels` usa o que é chamado de receita (`recipe`).
 Uma primeira receita: 
 
 ```{r}
-malaria_rec <- recipe(severe_malaria ~ ., data = malaria_train)
+malaria_rec <- recipe(severity ~ ., data = malaria_train)
 ```
 
 No exemplo acima, a função `recipe()` apenas define a variável resposta e os preditores através da fórmula.
@@ -193,7 +192,7 @@ Os passos de pré-processamento de uma receita usam os dados de treinamento para
 Um outro exemplo de receita:
 
 ```{r}
-malaria_rec <- recipe(severe_malaria ~ ., data = malaria_train) %>%
+malaria_rec <- recipe(severity ~ ., data = malaria_train) %>%
   step_poly(age, degree = 2)
 ```
 
@@ -205,7 +204,7 @@ kable_recipe <- function(rec) {
     prep() %>%
     juice() %>%
     head(10) %>%
-    select(severe_malaria, everything()) %>%
+    select(severity, everything()) %>%
     kableExtra::kable(booktabs = TRUE, digits = 3, linesep = "") %>%
     kableExtra::kable_styling(font_size = 8)
 }
@@ -314,7 +313,7 @@ Dentro de `tidymodels` temos a função `metrics()` do pacote `yardstick` para a
 ```{r}
 reg_fit %>%
   augment(new_data = malaria_train) %>%
-  metrics(truth = severe_malaria, estimate = .pred_class)
+  metrics(truth = severity, estimate = .pred_class)
 ```
 
 Podemos especificar apenas uma métrica:
@@ -322,7 +321,7 @@ Podemos especificar apenas uma métrica:
 ```{r}
 reg_fit %>%
   augment(new_data = malaria_train) %>%
-  accuracy(truth = severe_malaria, estimate = .pred_class)
+  accuracy(truth = severity, estimate = .pred_class)
 ```
 
 
@@ -331,7 +330,7 @@ We can look at the resulting confusion matrix:
 ```{r}
 reg_fit %>%
   augment(new_data = malaria_train) %>%
-  conf_mat(truth = severe_malaria, estimate = .pred_class)
+  conf_mat(truth = severity, estimate = .pred_class)
 ```
 
 
@@ -345,7 +344,7 @@ E podemos avaliar este conjunto de métricas no modelo ajustado:
 
 ```{r}
 augment(reg_fit, new_data = malaria_train) %>%
-  malaria_metrics(truth = severe_malaria, estimate = .pred_class)
+  malaria_metrics(truth = severity, estimate = .pred_class)
 ```
 
 
@@ -357,7 +356,7 @@ Ao calcularmos as métricas tanto no conjunto de treinamento quanto no de teste,
 ```{r}
 reg_fit %>%
   augment(malaria_train) %>%
-  metrics(truth = severe_malaria, estimate = .pred_class)
+  metrics(truth = severity, estimate = .pred_class)
 ```
 :::
 
@@ -365,7 +364,7 @@ reg_fit %>%
 ```{r}
 reg_fit %>%
   augment(malaria_test) %>%
-  metrics(truth = severe_malaria, estimate = .pred_class)
+  metrics(truth = severity, estimate = .pred_class)
 ```
 :::
 :::
@@ -382,7 +381,7 @@ Usaremos como exemplo 5 *folds*. Para fazer a reamostragem nos dados de treiname
 ```{r}
 set.seed(234)
 malaria_folds <- malaria_train %>%
-                vfold_cv(v = 5, strata = severe_malaria)
+                vfold_cv(v = 5, strata = severity)
 malaria_folds
 ```
 
@@ -428,16 +427,6 @@ reg_preds
 ```
 
 
-Podemos fazer um gráfico de preditos versus observados, separados por cada *fold* da validação cruzada:
-
-```{r,echo=TRUE, warning=FALSE}
-#| fig-align: center
-reg_preds %>% 
-  ggplot(aes(severe_malaria, .pred, color = id)) + 
-  geom_abline(lty = 2, col = "gray", size = 1.5) +
-  geom_point(alpha = 0.5) +
-  coord_obs_pred()
-```
 
 
 ## Árvore de decisão
@@ -446,14 +435,14 @@ Um outro modelo a ser considerado é árvore de decisão. Vamos considerar o seg
 
 ```{r}
   tree_spec <- decision_tree(cost_complexity = 0.02) %>%
-      set_mode("regression") %>%
+      set_mode("classification") %>%
       set_engine("rpart")
 ```
 
 O modelo de árvore de regressão não requer pré-processamento, de forma que podemos usar um workflow com a fórmula e o modelo especificado, por exemplo:
 
 ```{r}
-tree_wf <- workflow(severe_malaria ~ ., tree_spec)
+tree_wf <- workflow(severity ~ ., tree_spec)
 tree_wf
 ```
 
@@ -485,7 +474,7 @@ Para isso, existe a função `workflow_set()` que gera um conjunto de workflows.
  
  
 ```{r}
-wf_set <- workflow_set(preproc = list(rec1 = severe_malaria ~ ., rec2 = malaria_rec),
+wf_set <- workflow_set(preproc = list(rec1 = severity ~ ., rec2 = malaria_rec),
                        models = list(tree = tree_spec, reg = reg_spec),
                        cross = FALSE)
 ```
@@ -511,7 +500,7 @@ wf_set %>%
 Se o argumento `cross = TRUE` o `workflow_set` faz um produto cruzado das receitas e modelos:
 
 ```{r}
-workflow_set(preproc = list(rec1 = severe_malaria ~ ., rec2 = malaria_rec),
+workflow_set(preproc = list(rec1 = severity ~ ., rec2 = malaria_rec),
              models = list(tree = tree_spec, reg = reg_spec),
              cross = TRUE) %>%
   workflow_map("fit_resamples", resamples = malaria_folds) %>%
@@ -546,16 +535,6 @@ Predições para o conjunto de dados **teste**:
 ```{r}
 collect_predictions(final_fit) %>%
   head()
-```
-
-
-```{r,echo=TRUE}
-#| fig-align: center
-collect_predictions(final_fit) %>%
-  ggplot(aes(severe_malaria, .pred)) + 
-  geom_abline(lty = 2, col = "deeppink4", size = 1.5) +
-  geom_point(alpha = 0.5) +
-  coord_obs_pred()
 ```
 
 Quais informações temos em `final_fit`? 
@@ -593,7 +572,7 @@ Para um modelo de regressão linear em que uma das variáveis será considerada 
 ```{r}
 #| code-line-numbers: "4"
 malaria_rec <-
-  recipe(severe_malaria ~ ., data = malaria_train) %>%
+  recipe(severity ~ ., data = malaria_train) %>%
   step_dummy(all_nominal_predictors()) %>%
   step_poly(age, degree = tune())
 ```
@@ -604,7 +583,7 @@ Com a receita definida, vamos agregar as informações:
 
 
 ```{r}
-regpol_wf <- workflow(malaria_rec, linear_reg())
+regpol_wf <- workflow(malaria_rec, logistic_reg())
 regpol_wf
 ```
 
@@ -656,7 +635,7 @@ tree_spec <-
 A receita é definida:
 ```{r}
 tree_rec <- 
-  recipe(severe_malaria ~ ., data = malaria_train) %>%
+  recipe(severity ~ ., data = malaria_train) %>%
   step_dummy(all_nominal_predictors())
 ```
 
@@ -674,7 +653,7 @@ tree_res <-
   tune_grid(tree_wf, 
             resamples = malaria_folds, 
             grid = 15,
-            metrics = abalone_metrics)
+            metrics = malaria_metrics)
 ```
 
 É possível fornecer um `data.frame` na opção `grid`, para ser mais específico.
