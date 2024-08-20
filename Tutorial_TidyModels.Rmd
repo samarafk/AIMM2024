@@ -5,7 +5,7 @@ author:
   affiliation: 
   - Departament of Statistics - IMECC - UNICAMP
 - name: Samara Kiihl
-  affiliation: epartament of Statistics - IMECC - UNICAMP
+  affiliation: Departament of Statistics - IMECC - UNICAMP
 date: "August 29th 2024"  
 output: 
   BiocStyle::html_document:
