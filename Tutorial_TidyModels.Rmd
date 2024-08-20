@@ -453,7 +453,7 @@ logreg_cv %>%
 Through cross-validation, we evaluate the model's performance only with the training data, without using the test data.
 
 
-A métrica obtida no conjunto de validação pode ser tomada como uma estimativa da métrica no conjunto de teste. 
+The metric obtained on the validation set can be taken as an estimate of the metric on the test set.
 
 In case we need to save the predictions obtained in the cross-validation steps, to create a graph, for example, we use `control_resamples`:
 
@@ -621,21 +621,21 @@ final_fit %>%
   tidy()
 ```
 
-# Hiperparâmetros
+# Tuning Models
 
-Algumas características dos modelos não podem ser estimadas diretamente dos dados.
+Some model characteristics cannot be estimated directly from the data.
 
-Escolhemos um modelo de regressão linear, por exemplo, e usamos os dados de treinamento para obter os parâmetros do model.
+We choose a logistic regression model, for example, and use the training data to obtain the model parameters.
 
-No entanto, algumas escolhas são feitas antes do ajuste do modelo: usaremos alguma forma quadrática? interações? quais variáveis vamos considerar?
+However, some choices are made before fitting the model: will we use some quadratic form? interactions? What variables will we consider?
 
-Algumas decisões devem ser feitas na etapa *receita* e outras devem ser feitas *dentro do modelo*.
+Some decisions must be made at the *recipe* stage and others must be made *within the model*.
 
-Para ajuste fino, podemos testar *workflows* diferentes e avaliar o desempenho com validação cruzada.
+For tuning, we can test different *workflows* and evaluate their performances with cross-validation.
 
-## Regressão linear com polinômio
+## Polynomial Logistic Regression
 
-Para um modelo de regressão linear em que uma das variáveis será considerada através de um polinômio, temos a seguinte receita:
+For a logistic regression model in which one of the variables, `age`, will be considered through a polynomial, we have the following recipe:
 
 
 ```{r}
@@ -646,9 +646,9 @@ malaria_rec <-
   step_poly(age, degree = tune())
 ```
 
-Repare que, acima, não especificamos diretamente o grau do polinômio. Vamos escolher o melhor hiperparâmetro usando a função `tune()`.
+Note that, above, we did not directly specify the degree of the polynomial. Let's choose the best hyperparameter using the `tune()` function.
 
-Com a receita definida, vamos agregar as informações:
+With the recipe defined, let's aggregate the information:
 
 
 ```{r}
@@ -656,7 +656,8 @@ logregpol_wf <- workflow(malaria_rec, logistic_reg())
 logregpol_wf
 ```
 
-A função `tune_grid()` calcula um conjunto de métricas usando validação cruzada para avaliar o desempenho em um conjunto pré-determinado de hiperparâmetros de um modelo ou de uma receita:
+The `tune_grid()` function calculates a set of metrics using cross-validation to evaluate performance on a pre-determined set of hyperparameters of a model or recipe:
+
 
 ```{r}
 set.seed(123)
@@ -664,34 +665,35 @@ logregpol_res <- tune_grid(logregpol_wf, malaria_folds, grid = tibble(degree=1:6
 logregpol_res
 ```
 
-Apresentando os resultados (média dos 5 *folds*) para cada grau de polinômio (hiperparâmetro) considerado:
+Presenting the results (average of the 5 *folds*) for each degree of polynomial (the tuning parameter/hyperparameter) considered:
 
 
 ```{r}
 collect_metrics(logregpol_res)
 ```
 
-Visualização gráfica usando `autoplot()`:
+Graphical visualization using `autoplot()`:
 
 ```{r}
 #| fig-align: 'center'
 autoplot(logregpol_res, metric = "accuracy")
 ```
 
-Mostrando os melhores resultados:
+Showing the best results:
 ```{r}
 show_best(logregpol_res, metric = "accuracy", n = 3)
 ```
 
 
-E se ajustarmos um outro modelo, também com algum outro hiperparâmetro? Como comparar?
+What if we fit another model, also with some other hyperparameter? How to compare?
 
 
-## Árvore de decisão
+## Decision Tree
 
-A seguir temos um *workflow* para árvore de decisão com ajuste de hiperparâmetro.
+Below is a *workflow* for a decision tree with hyperparameter tuning.
 
-Primeiro, o modelo é especificado incluindo `tune()`:
+First, the model is specified by including `tune()`:
+
 ```{r}
 tree_spec <-
   decision_tree(
@@ -701,7 +703,7 @@ tree_spec <-
   set_engine("rpart")
 ```
 
-A receita é definida:
+The recipe is defined:
 ```{r}
 tree_rec <- 
   recipe(severity ~ ., data = malaria_train) %>%
@@ -709,12 +711,12 @@ tree_rec <-
 ```
 
 
-Essas duas informações são agregadaas com *workflow*:
+These two pieces of information are aggregated with *workflow*:
 ```{r}
 tree_wf <- workflow(tree_rec, tree_spec) 
 ```
 
-Vamos usar `tune_grid()` para avaliar vários valores para o hiperparâmwtro:
+Let's use `tune_grid()` to evaluate multiple values for the hyperparameter:
 
 ```{r tree-tune}
 set.seed(9)
@@ -725,15 +727,15 @@ tree_res <-
             metrics = malaria_metrics)
 ```
 
-É possível fornecer um `data.frame` na opção `grid`, para ser mais específico.
+It is possible to provide a `data.frame` in the `grid` option, to be more specific.
 
-Métricas obtidas através de validação cruzada considerando os valores de `grid`: 
+Metrics obtained through cross-validation considering the `grid` values:
 
 ```{r}
 tree_res %>% collect_metrics()
 ```
 
-Em resumo, o melhor resultado para regressão polinomial, segundo a validação cruzada:
+In summary, the best result for polynomial regression, according to cross-validation:
 
 ```{r}
 logregpol_res %>% 
@@ -742,7 +744,7 @@ logregpol_res %>%
 ```
 
 
-E melhor resultado para regressão polinomial, segundo a validação cruzada:
+And the best result for polynomial logistic regression, according to cross validation:
 
 ```{r xgboost-best}
 tree_res %>% 
@@ -750,48 +752,47 @@ tree_res %>%
   select(.metric, .estimator, mean, n, std_err, .config)
 ```
 
-Entre as duas opções (regressão polinomial e árvore), vamos ficar com a regressão polinomial. Vamos selecionar o modelo com hiperparâmtro de melhor desempenho: 
+Let's assume, for instance, that between the two options (polynomial logistic regression and tree), we will stick with polynomial logistic regression. Let's select the model with the best performing hyperparameter:
 
 ```{r}
-best_rmse <- select_best(logregpol_res, metric = "accuracy")
-best_rmse
+best_acc <- select_best(logregpol_res, metric = "accuracy")
+best_acc
 ```
 
-E ajustando o modelo final: 
+And adjusting the final model:
 
 
 ```{r}
 final_res <-
   logregpol_wf %>% 
-  finalize_workflow(best_rmse) %>%
+  finalize_workflow(best_acc) %>%
   last_fit(malaria_split)
 final_res
 ```
 
 
-`last_fit()` ajusta o modelo final com os dados de treino e avalia o desempenho nos dados de teste. 
+`last_fit()` fits the final model with the training data and evaluates the performance on the test data.
 
-Resultado no conjunto de teste:
+Results on test set:
 
 ```{r test-res}
 final_res %>% collect_metrics()
 ```
 
 
-*Workflow* final
+For the selected final *workflow*, we save all final adjustment steps (obtained using the training set):
 
-Guardar todos os passos do ajuste final (obtidos usando o conjunto de treinamento):
 ```{r}
 fitted_wf <- extract_workflow(final_res)
 fitted_wf
 ```
 
-Obter valores preditos:
+Get predicted values:
 ```{r}
 predict(fitted_wf, malaria_test[1:3,])
 ```
 
-*Workflow* final:
+Final *workflow*:
 
 
 ```{r}
