@@ -1,11 +1,11 @@
 ---
-title: "Uma Jornada pelos TidyModels em R"
+title: "TidyModels in R with Malaria Data Application"
 author:
 - name: Tatiana Benaglia
   affiliation: 
-  - Departamento de Estatística - IMECC - UNICAMP
+  - Departament of Statistics - IMECC - UNICAMP
 - name: Samara Kiihl
-  affiliation: Departamento de Estatística - IMECC - UNICAMP
+  affiliation: epartament of Statistics - IMECC - UNICAMP
 date: "August 29th 2024"  
 output: 
   BiocStyle::html_document:
@@ -31,7 +31,7 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE)
 
 # Introduction
 
-This document is part of the tutorial presented during the Artificial Intelligence for Malaria (and Infectious Diseases) Modelling in Brazil and Latin America ([AIMM 2024](https://sally.ufba.br/AIMM2024.html)).
+This document is part of the tutorial presented during the Artificial Intelligence for Malaria (and Infectious Diseases) Modelling in Brazil and Latin America ([AIMM 2024](https://sally.ufba.br/AIMM2024.html)) at [IMECC, UNICAMP](https://ime.unicamp.br/).
 
 Source files are available on <https://github.com/samarafk/AIMM2024>.
 
@@ -84,6 +84,8 @@ We use the function `initial_split()`. By default, this function splits the data
 
 ```{r}
 library(tidymodels)
+tidymodels_prefer()
+
 set.seed(1234)
 malaria_split <- initial_split(malaria, prop = 0.8, strata = severity)
 ```
@@ -273,7 +275,7 @@ Prediction with `tidymodels` ensures that:
 - column names and types are predictable and intuitive;
 - the number of lines in `new_data` and the output are the same.
 
-You can also use the `augment()` function, which calculates the predicted values ​​and residuals, adding them into a column in the specified data set:
+You can also use the `augment()` function, which calculates the predicted values and residuals, adding them into a column in the specified data set:
 
 ```{r}
 logreg_fit %>% augment(malaria_train)
@@ -281,35 +283,36 @@ logreg_fit %>% augment(malaria_train)
 
   
   
-# Avaliar e comparar modelos
+# Evaluating and Comparing Models
 
-Até aqui, fizemos o pré-processamento, definimos e treinamos o modelo escolhido usando os dados de treinamento.
-
-
-## Métricas
-
-Como avaliar se o modelo tem bom desempenho (foco em predição)?
+So far, we have pre-processed, defined and trained the chosen model using the training data.
 
 
-Olhar os resultados para cada observação não é produtivo:
+## Metrics
+
+How to evaluate whether the model has good performance (here our focus is on prediction)?
+
+Looking at the results for each observation is not productive:
 
 ```{r}
 logreg_fit %>%
-  augment(malaria_train) %>% 
+  augment(new_data = malaria_train) %>% 
   head()
 ```
 
-Temos algumas métricas para comparar os valores preditos com os observados (erro de predição):
-
--   Erro Quadrático Médio: $RMSE=\sqrt{\frac{1}{n}\sum_{i=1}^n(y_i-\hat{y}_i)^2}$
--   Coeficiente de determinação: $R^2$
--   Erro Médio Absoluto: $MAE=\frac{1}{n}\sum_{i=1}^n|y_i-\hat{y}_i|$
+We have some metrics to compare predicted values with observed values (prediction error):
 
 
-Dentro de `tidymodels` temos a função `metrics()` do pacote `yardstick` para avaliar o modelo. Temos que especificar os seguintes argumentos em `metrics()`:
+-   Confusion matrix
+-   Accuracy
+-   Sensitivity
+-   Specificity
 
-* `truth`: nome da variável com os valores observados da resposta
-* `estimate`: nome da variável contendo os valores preditos
+
+Inside `tidymodels` we have the `metrics()` function from the `yardstick` package to evaluate the model. We have to specify the following arguments in `metrics()`:
+
+* `truth`: name of the variable with the observed values of the response
+* `estimate`: name of the variable containing the predicted values
 
 ```{r}
 logreg_fit %>%
@@ -317,7 +320,7 @@ logreg_fit %>%
   metrics(truth = severity, estimate = .pred_class)
 ```
 
-Podemos especificar apenas uma métrica:
+We can specify just one metric:
 
 ```{r}
 logreg_fit %>%
@@ -334,22 +337,32 @@ logreg_fit %>%
   conf_mat(truth = severity, estimate = .pred_class)
 ```
 
+And also make a plot to illustrate the results:
 
-Também é possível especificar um conjunto de métricas. No exemplo a seguir, `abalone_metrics` é definido como um conjunto de quatro métricas: RMSE, MAE, MAPE e $R^2$:
+```{r}
+logreg_fit %>%
+  augment(new_data = malaria_train) %>%
+  conf_mat(truth = severity, estimate = .pred_class) %>%
+  autoplot(type = "heatmap")
+```
+
+
+
+
+We can also specify a set of metrics. In the following example, `malaria_metrics` is defined as a set of three metrics:
 
 ```{r}
 malaria_metrics <- metric_set(accuracy, sensitivity, specificity)
 ```
 
-E podemos avaliar este conjunto de métricas no modelo ajustado: 
-
+And we can evaluate this set of metrics in the fitted model:
 ```{r}
 augment(logreg_fit, new_data = malaria_train) %>%
   malaria_metrics(truth = severity, estimate = .pred_class)
 ```
 
 
-Ao calcularmos as métricas tanto no conjunto de treinamento quanto no de teste, podemos avaliar se o modelo está super-ajustando (*overfitting*):
+By calculating metrics on both the training and testing sets, we can assess whether the model is overfitting:
 
 
 ::: columns
@@ -371,13 +384,37 @@ logreg_fit %>%
 :::
 
 
-ROC CURVES
+This metrics use the 50\% threshold to declare an event (if the estimated probability is above 0.5, we declare severity = 1 and 0 otherwise.)
 
-https://workshops.tidymodels.org/slides/intro-04-evaluating-models.html#/roc-curves-2
+What if we decide to set the probability to declare an event equals to 80\%? Varying this threshold affects sensitivity and specificity metrics.
 
-## Validação cruzada
+We can use ROC (receiver operator characteristic):
 
-Usaremos como exemplo 5 *folds*. Para fazer a reamostragem nos dados de treinamento, usaremos o comando `vfold_cv`:
+* x-axis: the false positive rate (1 - specificity)
+* y-axis: the true positive rate (sensitivity)
+
+so we have a scenario with sensitivity and specificity calculated at all possible thresholds.
+
+The area under the ROC curve can be used as a metric. 
+
+```{r}
+augment(logreg_fit, new_data = malaria_train) %>% 
+  roc_auc(truth = severity, .pred_1)
+```
+
+
+And select a few *slices* to see their values:
+```{r}
+augment(logreg_fit, new_data = malaria_train) %>% 
+  roc_curve(truth = severity, .pred_1) %>%
+  slice(1, 20, 50)
+```
+
+
+## Cross Validation
+
+We will use 5 *folds* as an example. To resample the training data, we will use the `vfold_cv` command:
+
 
 ```{r}
 set.seed(234)
@@ -386,21 +423,22 @@ malaria_folds <- malaria_train %>%
 malaria_folds
 ```
 
-Ajustando o modelo nas reamostras:
+Fitting the model on resamples:
 
 ```{r}
 logreg_cv <- logreg_wf %>% fit_resamples(malaria_folds)
 logreg_cv
 ```
 
-A função `collect_metrics()` extrai as métricas obtidas em cada reamostra e calcula a métrica da validação, geralmente através de uma média:
+The `collect_metrics()` function extracts the metrics obtained in each resample and calculates the validation metric, generally through an average:
 
 ```{r}
 logreg_cv %>%
   collect_metrics()
 ```
 
-Para calcular um conjunto escolhido de métricas, é preciso especificar o conjunto no argumento `metrics` dentro de `fit_resamples`:
+
+To calculate a chosen set of metrics, you need to specify the set in the `metrics` argument within `fit_resamples`:
 
 ```{r}
 logreg_cv <- fit_resamples(logreg_wf, 
@@ -412,11 +450,12 @@ logreg_cv %>%
 ```
 
 
-Através da validação cruzada, avaliamos o desempenho do modelo apenas com os dados de treinamento, sem usar os dados de teste.
+Through cross-validation, we evaluate the model's performance only with the training data, without using the test data.
+
 
 A métrica obtida no conjunto de validação pode ser tomada como uma estimativa da métrica no conjunto de teste. 
 
-Caso seja necessário salvar as predições obtidas nas etapas de validação cruzada, para fazer um gráfico, por exemplo, usamos `control_resamples`:
+In case we need to save the predictions obtained in the cross-validation steps, to create a graph, for example, we use `control_resamples`:
 
 ```{r}
 ctrl_malaria <- control_resamples(save_pred = TRUE)
@@ -430,31 +469,32 @@ logreg_preds
 
 
 
-## Árvore de decisão
+## Decision Tree
 
-Um outro modelo a ser considerado é árvore de decisão. Vamos considerar o seguinte exemplo:
+Another model to consider is decision tree. Let's consider the following example:
 
 ```{r}
-  tree_spec <- decision_tree(cost_complexity = 0.02) %>%
-      set_mode("classification") %>%
-      set_engine("rpart")
+tree_spec <- decision_tree(cost_complexity = 0.02) %>%
+    set_mode("classification") %>%
+    set_engine("rpart")
+tree_spec
 ```
 
-O modelo de árvore de regressão não requer pré-processamento, de forma que podemos usar um workflow com a fórmula e o modelo especificado, por exemplo:
+The decision tree model does not require preprocessing, so we can use a workflow with the specified formula and a specified model, for example:
 
 ```{r}
 tree_wf <- workflow(severity ~ ., tree_spec)
 tree_wf
 ```
 
-E o ajuste é com os dados de treinamento:
+And then fit with training data:
 
 ```{r}
 tree_fit <- tree_wf %>% fit(data = malaria_train)
 ```  
 
 
-Vamos então avaliar o desempenho da árvore de decisão usando validação cruzada:
+Let's then evaluate the performance of the decision tree using cross-validation:
 
 ```{r}
 tree_cv <- tree_wf %>% fit_resamples(malaria_folds)
@@ -463,25 +503,54 @@ tree_cv %>% collect_metrics()
 ```  
 
 
-## Conjunto de modelos
+## Random Forest
 
-Quando queremos comparar vários modelos ao mesmo, fica muito trabalhoso fazer um por vez, como mostramos anteriormente.
+We can also consider a random forest model:
 
-Para isso, existe a função `workflow_set()` que gera um conjunto de workflows. Os argumentos desta função são:
+```{r}
+rf_spec <- rand_forest(trees = 1000) %>%
+    set_mode("classification")
+rf_spec
+```
 
- * `preproc`: formulas, receitas
- * `models`: modelos especificados usando `parsnip`
+A simple workflow:
+
+```{r}
+rf_wf <- workflow(severity ~ ., rf_spec)
+rf_wf
+```
+
+Evaluation of the metrics using cross-validation:
+
+```{r}
+set.seed(2024) #RF uses random numbers, so we need to set the seed
+rf_cv <- rf_wf %>% 
+  fit_resamples(malaria_folds)
+
+rf_cv %>% collect_metrics()
+```
+
+
+## A Set of Models
+
+When we want to compare several models at the same time, it becomes a lot of work to do one at a time, as we showed previously.
+
+For this, there is the `workflow_set()` function that generates a set of workflows. The arguments of this function are:
+
+* `preproc`: formulas, recipes
+* `models`: models specified using `parsnip`
  
  
+ Here, we define a set of workflows of interest:
  
 ```{r}
-wf_set <- workflow_set(preproc = list(rec1 = severity ~ ., rec2 = malaria_rec),
-                       models = list(tree = tree_spec, reg = logreg_spec),
+wf_set <- workflow_set(preproc = list(rec1 = severity ~ ., rec2 = malaria_rec, rec1 = severity ~ .),
+                       models = list(tree = tree_spec, logreg = logreg_spec, rf = rf_spec),
                        cross = FALSE)
 ```
 
 
-Agora podemos avaliar os modelos com as métricas desejadas usando a validação cruzada:
+We can now evaluate the models with the desired metrics using cross-validation:
 
 
 ```{r}
@@ -490,7 +559,7 @@ wf_set %>%
   rank_results()
 ```
 
-E para focarmos apenas nos melhores resultados:
+And to focus only on the best results:
 
 ```{r}
 wf_set %>%
@@ -498,39 +567,38 @@ wf_set %>%
   rank_results()
 ```  
 
-Se o argumento `cross = TRUE` o `workflow_set` faz um produto cruzado das receitas e modelos:
+If the argument `cross = TRUE` the `workflow_set` makes a cross product of the recipes and models listed:
 
 ```{r}
 workflow_set(preproc = list(rec1 = severity ~ ., rec2 = malaria_rec),
-             models = list(tree = tree_spec, reg = logreg_spec),
+             models = list(tree = tree_spec, logreg = logreg_spec, rf = rf_spec),
              cross = TRUE) %>%
   workflow_map("fit_resamples", resamples = malaria_folds) %>%
   rank_results()
 ```  
 
-Suponha que o modelo de regressão linear tenha sido o escolhido.
+Let's suppose the logistic regression model was chosen.
 
-Vamos ajustar o modelo nos dados de treinamento e verificar o desempenho nos dados de teste.
-
-Vimos os comandos `fit()` e `predict()`/`augment()`, mas podemos usar a função `final_fit()`, que combina esses passos.
+Let's fit the model on training data and check performance on testing data:
 
 ```{r}
 final_fit <- last_fit(logreg_wf, malaria_split) 
 ```
 
-Lembre-se que o objeto `malaria_split` tem informações sobre a separação dados originais em treino e teste.
+Remember that the `malaria_split` object has information about the separation of original data into training and testing.
+
 
 ```{r}
 final_fit
 ```
 
-Métricas calculadas para o conjunto de dados **teste**:
+Metrics calculated for the **test** dataset:
 
 ```{r}
 collect_metrics(final_fit) 
 ```
 
-Predições para o conjunto de dados **teste**:
+Predictions for the **test** dataset:
 
 
 ```{r}
@@ -538,14 +606,14 @@ collect_predictions(final_fit) %>%
   head()
 ```
 
-Quais informações temos em `final_fit`? 
+What information do we have in `final_fit`?
 
 ```{r}
 extract_workflow(final_fit)
 ```
 
 
-Quais as estimativas dos parâmetros do modelo final?
+What are the parameter estimates of the final model?
 
 ```{r}
 final_fit %>% 
