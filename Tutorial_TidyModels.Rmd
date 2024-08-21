@@ -172,13 +172,13 @@ To do this, `tidymodels` uses what is called a recipe (`recipe`).
 First simple recipe:
 
 ```{r}
-malaria_rec <- recipe(severity ~ ., data = malaria_train)
+rec_simple <- recipe(severity ~ ., data = malaria_train)
 ```
 
 In the example above, the `recipe()` function defines the response variable and the predictors through the formula.
 
 ```{r}
-malaria_rec %>% summary()
+rec_simple %>% summary()
 ```
 
 
@@ -303,10 +303,11 @@ logreg_fit %>%
 We have some metrics to compare predicted values with observed values (prediction error):
 
 
--   Confusion matrix
--   Accuracy
--   Sensitivity
--   Specificity
+- **Confusion Matrix**
+- **Accuracy**: $\frac{TP+TN}{TP+FP+FN+TN}$
+- **Sensitivity**: $\frac{TP}{TP+FN}$
+- **Specificity**: $\frac{TN}{FP+TN}$
+- **Brier score**: score is analogous to the mean squared error in regression models $\frac{1}{n}\sum_{i=1}^n\sum_{k=1}^C(y_{ik}-\hat{p}_{ik})^2$
 
 
 Inside `tidymodels` we have the `metrics()` function from the `yardstick` package to evaluate the model. We have to specify the following arguments in `metrics()`:
@@ -575,7 +576,8 @@ workflow_set(preproc = list(rec1 = severity ~ ., rec2 = malaria_rec),
              cross = TRUE) %>%
   workflow_map("fit_resamples", resamples = malaria_folds) %>%
   rank_results()
-```  
+```
+
 
 Let's suppose the logistic regression model was chosen.
 
@@ -642,7 +644,6 @@ For a logistic regression model in which one of the variables, `age`, will be co
 #| code-line-numbers: "4"
 malaria_rec <-
   recipe(severity ~ ., data = malaria_train) %>%
-  step_dummy(all_nominal_predictors()) %>%
   step_poly(age, degree = tune())
 ```
 
@@ -679,7 +680,7 @@ Graphical visualization using `autoplot()`:
 autoplot(logregpol_res, metric = "accuracy")
 ```
 
-Showing the best results:
+Showing the 3 best results:
 ```{r}
 show_best(logregpol_res, metric = "accuracy", n = 3)
 ```
@@ -690,7 +691,7 @@ What if we fit another model, also with some other hyperparameter? How to compar
 
 ## Decision Tree
 
-Below is a *workflow* for a decision tree with hyperparameter tuning.
+Below is a *workflow* for a decision tree with hyperparameter (`cost_complexity`) tuning.
 
 First, the model is specified by including `tune()`:
 
@@ -705,15 +706,14 @@ tree_spec <-
 
 The recipe is defined:
 ```{r}
-tree_rec <- 
-  recipe(severity ~ ., data = malaria_train) %>%
-  step_dummy(all_nominal_predictors())
+rec_simple <- 
+  recipe(severity ~ ., data = malaria_train)
 ```
 
 
-These two pieces of information are aggregated with *workflow*:
+The *workflow*:
 ```{r}
-tree_wf <- workflow(tree_rec, tree_spec) 
+tree_wf <- workflow(rec_simple, tree_spec) 
 ```
 
 Let's use `tune_grid()` to evaluate multiple values for the hyperparameter:
@@ -735,18 +735,149 @@ Metrics obtained through cross-validation considering the `grid` values:
 tree_res %>% collect_metrics()
 ```
 
-In summary, the best result for polynomial regression, according to cross-validation:
 
 ```{r}
-logregpol_res %>% 
-  show_best(metric = "accuracy", n = 1) %>% 
-  select(.metric, .estimator, mean, n, std_err, .config)
+autoplot(tree_res)
 ```
+
+
+
+The best result from cross validation, considering accuracy metric:
+```{r}
+show_best(tree_res, metric = "accuracy", n = 1)
+```
+
+
+## Random Forest
+
+
+There is a tuning parameter that is commonly chosen for random forest models.
+
+`mtry` is the number of predictors that will be randomly sampled at each split when creating the tree models. For the `ranger` engine, the [default](https://parsnip.tidymodels.org/reference/details_rand_forest_ranger.html) it `floor(sqrt(ncol(x)))`.
+
+Let's use cross validation to tune this parameter.
+
+We start by specifying the model and including `tune()`:
+
+```{r}
+rf_spec <- rand_forest(trees = 1000,
+                       mtry = tune()) %>%
+    set_mode("classification")
+rf_spec
+```
+
+A workflow with a formula:
+
+```{r}
+rf_wf <- workflow(severity ~ ., rf_spec)
+rf_wf
+```
+
+
+Let's use `tune_grid()` to evaluate multiple values for the hyperparameter:
+
+```{r rf-tune}
+set.seed(9)
+rf_res <-
+  tune_grid(rf_wf, 
+            resamples = malaria_folds, 
+            grid = 15,
+            metrics = malaria_metrics)
+```
+
+
+Resulting metrics from cross-validation considering the grid values:
+
+```{r}
+rf_res %>% collect_metrics()
+```
+
+
+```{r}
+autoplot(rf_res)
+```
+
+
+The best result from cross validation, considering accuracy metric:
+```{r}
+show_best(rf_res, metric = "accuracy", n = 1)
+```
+
+
+
+## Extra (more advanced): all at once
+
+We can define a set of workflows and then evaluate it using `tune_grid`.
+
+```{r}
+wf_tune_set <- workflow_set(preproc = list(rec1 = severity ~ ., 
+                                           rec2 = malaria_rec,
+                                           rec1 = severity ~ .),
+                       models = list(tree = tree_spec, 
+                                     logreg = logreg_spec, 
+                                     rf = rf_spec),
+                       cross = FALSE)
+```
+
+
+```{r}
+wf_tune_res <-  wf_tune_set %>% workflow_map(resamples = malaria_folds, 
+                             grid = 20,
+                             control = control_grid(save_pred = TRUE))
+```
+
+
+FAZER
+
+https://www.tmwr.org/workflow-sets
+
+```{r}
+tune_results <- wf_tune_res %>% 
+  collect_metrics()
+tune_results
+```
+
+
+```{r}
+best_wf_id <- wf_tune_res %>% 
+  rank_results() %>% 
+  filter(.metric == "accuracy") %>%
+  arrange(desc(mean)) %>%
+  slice(1) %>%  # Select the best one
+  pull(wflow_id)
+best_wf_id
+```
+
+```{r}
+# Step 2: Extract the best workflow
+best_workflow <- wf_tune_set %>%
+  extract_workflow(best_wf_id)
+
+# Finalize the workflow with the best hyperparameters
+best_workflow_final <- best_workflow %>%
+  finalize_workflow(
+    wf_tune_res %>%
+      extract_workflow_set_result(best_wf_id) %>%
+      select_best(metric = "accuracy")
+  )
+
+```
+
+
+```{r}
+final_res <-
+  best_workflow_final %>%
+  last_fit(malaria_split)
+final_res
+```
+
+
+
 
 
 And the best result for polynomial logistic regression, according to cross validation:
 
-```{r xgboost-best}
+```{r}
 tree_res %>% 
   show_best(metric = "accuracy", n = 1) %>% 
   select(.metric, .estimator, mean, n, std_err, .config)
