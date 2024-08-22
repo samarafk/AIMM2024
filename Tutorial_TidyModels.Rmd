@@ -63,7 +63,8 @@ malaria <- malaria %>% rename(severity = severe_maleria)
 The first 10 observations:
 
 ```{r}
-malaria %>% head(10)
+library(kableExtra)
+malaria %>% head(10) %>% kable(booktabs = TRUE)
 ```
 
 The response variable is `severity`. `tidymodels` expects the outcome to be a factor and it also treats the first level as the event:
@@ -178,7 +179,7 @@ rec_simple <- recipe(severity ~ ., data = malaria_train)
 In the example above, the `recipe()` function defines the response variable and the predictors through the formula.
 
 ```{r}
-rec_simple %>% summary()
+rec_simple %>% summary() %>% kable(booktabs = TRUE)
 ```
 
 
@@ -209,7 +210,7 @@ kable_recipe <- function(rec) {
     head(10) %>%
     select(severity, everything()) %>%
     kableExtra::kable(booktabs = TRUE, digits = 3, linesep = "") %>%
-    kableExtra::kable_styling(font_size = 8)
+    kableExtra::kable_styling(font_size = 10)
 }
 
 kable_recipe(malaria_rec)
@@ -253,13 +254,15 @@ logreg_fit
 The `tidy()` function from the `broom` package summarizes the most important information of a model using the *tidy* concept:
 
 ```{r}
-logreg_fit %>% tidy(conf.int = TRUE)
+logreg_fit %>% tidy(conf.int = TRUE) %>% 
+  kable(booktabs = TRUE)
 ```
 
 
 
 ```{r}
-logreg_fit %>% tidy(conf.int = TRUE, exponentiate = TRUE)
+logreg_fit %>% tidy(conf.int = TRUE, exponentiate = TRUE) %>% 
+  kable(booktabs = TRUE)
 ```
 
 The `predict()` function calculates the predicted values for the specified dataset:
@@ -307,7 +310,8 @@ We have some metrics to compare predicted values with observed values (predictio
 - **Accuracy**: $\frac{TP+TN}{TP+FP+FN+TN}$
 - **Sensitivity**: $\frac{TP}{TP+FN}$
 - **Specificity**: $\frac{TN}{FP+TN}$
-- **Brier score**: score is analogous to the mean squared error in regression models $\frac{1}{n}\sum_{i=1}^n\sum_{k=1}^C(y_{ik}-\hat{p}_{ik})^2$
+- **Brier score**: score is analogous to the mean squared error in regression models $\frac{1}{n}\sum_{i=1}^n\sum_{k=1}^C(y_{ik}-\hat{p}_{ik})^2
+- **Kappa**: a similar measure to accuracy, but is normalized by the accuracy that would be expected by chance alone and is very useful when one or more classes have large frequency distributions.
 
 
 Inside `tidymodels` we have the `metrics()` function from the `yardstick` package to evaluate the model. We have to specify the following arguments in `metrics()`:
@@ -318,7 +322,8 @@ Inside `tidymodels` we have the `metrics()` function from the `yardstick` packag
 ```{r}
 logreg_fit %>%
   augment(new_data = malaria_train) %>%
-  metrics(truth = severity, estimate = .pred_class)
+  metrics(truth = severity, estimate = .pred_class) %>% 
+  kable(booktabs = TRUE)
 ```
 
 We can specify just one metric:
@@ -326,7 +331,8 @@ We can specify just one metric:
 ```{r}
 logreg_fit %>%
   augment(new_data = malaria_train) %>%
-  accuracy(truth = severity, estimate = .pred_class)
+  accuracy(truth = severity, estimate = .pred_class) %>% 
+  kable(booktabs = TRUE)
 ```
 
 
@@ -359,7 +365,8 @@ malaria_metrics <- metric_set(accuracy, sensitivity, specificity)
 And we can evaluate this set of metrics in the fitted model:
 ```{r}
 augment(logreg_fit, new_data = malaria_train) %>%
-  malaria_metrics(truth = severity, estimate = .pred_class)
+  malaria_metrics(truth = severity, estimate = .pred_class) %>% 
+  kable(booktabs = TRUE)
 ```
 
 
@@ -379,7 +386,7 @@ logreg_fit %>%
 ```{r}
 logreg_fit %>%
   augment(malaria_test) %>%
-  metrics(truth = severity, estimate = .pred_class)
+  metrics(truth = severity, estimate = .pred_class) 
 ```
 :::
 :::
@@ -400,7 +407,8 @@ The area under the ROC curve can be used as a metric.
 
 ```{r}
 augment(logreg_fit, new_data = malaria_train) %>% 
-  roc_auc(truth = severity, .pred_1)
+  roc_auc(truth = severity, .pred_1) %>% 
+  kable(booktabs = TRUE)
 ```
 
 
@@ -408,11 +416,12 @@ And select a few *slices* to see their values:
 ```{r}
 augment(logreg_fit, new_data = malaria_train) %>% 
   roc_curve(truth = severity, .pred_1) %>%
-  slice(1, 20, 50)
+  slice(1, 20, 50) %>% 
+  kable(booktabs = TRUE)
 ```
 
 
-## Cross Validation
+## Cross-Validation
 
 We will use 5 *folds* as an example. To resample the training data, we will use the `vfold_cv` command:
 
@@ -435,7 +444,8 @@ The `collect_metrics()` function extracts the metrics obtained in each resample 
 
 ```{r}
 logreg_cv %>%
-  collect_metrics()
+  collect_metrics() %>% 
+  kable(booktabs = TRUE)
 ```
 
 
@@ -447,7 +457,8 @@ logreg_cv <- fit_resamples(logreg_wf,
                  metrics = malaria_metrics)
 
 logreg_cv %>%
-  collect_metrics()
+  collect_metrics() %>% 
+  kable(booktabs = TRUE)
 ```
 
 
@@ -456,13 +467,15 @@ Through cross-validation, we evaluate the model's performance only with the trai
 
 The metric obtained on the validation set can be taken as an estimate of the metric on the test set.
 
-In case we need to save the predictions obtained in the cross-validation steps, to create a graph, for example, we use `control_resamples`:
+In case we need to save the predictions obtained in the cross-validation steps, we use `control_resamples`:
 
 ```{r}
 ctrl_malaria <- control_resamples(save_pred = TRUE)
+
 logreg_cv <- fit_resamples(logreg_wf, 
                malaria_folds, 
                control = ctrl_malaria)
+
 logreg_preds <- collect_predictions(logreg_cv)
 logreg_preds
 ```
@@ -481,7 +494,7 @@ tree_spec <- decision_tree(cost_complexity = 0.02) %>%
 tree_spec
 ```
 
-The decision tree model does not require preprocessing, so we can use a workflow with the specified formula and a specified model, for example:
+The decision tree model does not require preprocessing, so we can use a workflow with the specified formula and the specified model:
 
 ```{r}
 tree_wf <- workflow(severity ~ ., tree_spec)
@@ -500,7 +513,8 @@ Let's then evaluate the performance of the decision tree using cross-validation:
 ```{r}
 tree_cv <- tree_wf %>% fit_resamples(malaria_folds)
   
-tree_cv %>% collect_metrics()
+tree_cv %>% collect_metrics() %>% 
+  kable(booktabs = TRUE)
 ```  
 
 
@@ -528,7 +542,8 @@ set.seed(2024) #RF uses random numbers, so we need to set the seed
 rf_cv <- rf_wf %>% 
   fit_resamples(malaria_folds)
 
-rf_cv %>% collect_metrics()
+rf_cv %>% collect_metrics() %>% 
+  kable(booktabs = TRUE)
 ```
 
 
@@ -536,7 +551,7 @@ rf_cv %>% collect_metrics()
 
 When we want to compare several models at the same time, it becomes a lot of work to do one at a time, as we showed previously.
 
-For this, there is the `workflow_set()` function that generates a set of workflows. The arguments of this function are:
+`tidymodels` comes handy one more time. First, we can use the `workflow_set()` function to generate a set of workflows. The arguments of this function are:
 
 * `preproc`: formulas, recipes
 * `models`: models specified using `parsnip`
@@ -551,22 +566,18 @@ wf_set <- workflow_set(preproc = list(rec1 = severity ~ ., rec2 = malaria_rec, r
 ```
 
 
-We can now evaluate the models with the desired metrics using cross-validation:
+To process this series of workflows, we use the `workflow_map()` function. We can evaluate the models with our chosen metrics using cross-validation by setting the option `fit_resamples`:
 
 
 ```{r}
 wf_set %>%
-  workflow_map("fit_resamples", resamples = malaria_folds) %>%
+  workflow_map("fit_resamples", 
+               resamples = malaria_folds,
+               metrics = malaria_metrics,
+               seed = 2024) %>%
   rank_results()
 ```
 
-And to focus only on the best results:
-
-```{r}
-wf_set %>%
-  workflow_map("fit_resamples", resamples = malaria_folds) %>%
-  rank_results()
-```  
 
 If the argument `cross = TRUE` the `workflow_set` makes a cross product of the recipes and models listed:
 
@@ -574,7 +585,10 @@ If the argument `cross = TRUE` the `workflow_set` makes a cross product of the r
 workflow_set(preproc = list(rec1 = severity ~ ., rec2 = malaria_rec),
              models = list(tree = tree_spec, logreg = logreg_spec, rf = rf_spec),
              cross = TRUE) %>%
-  workflow_map("fit_resamples", resamples = malaria_folds) %>%
+  workflow_map("fit_resamples", 
+               resamples = malaria_folds,
+               metrics = malaria_metrics,
+               seed = 2024) %>%
   rank_results()
 ```
 
@@ -584,7 +598,9 @@ Let's suppose the logistic regression model was chosen.
 Let's fit the model on training data and check performance on testing data:
 
 ```{r}
-final_fit <- last_fit(logreg_wf, malaria_split) 
+final_fit <- last_fit(logreg_wf, 
+                      malaria_split,
+                      metrics = malaria_metrics) 
 ```
 
 Remember that the `malaria_split` object has information about the separation of original data into training and testing.
@@ -623,7 +639,7 @@ final_fit %>%
   tidy()
 ```
 
-# Tuning Models
+# Tuning
 
 Some model characteristics cannot be estimated directly from the data.
 
@@ -647,24 +663,27 @@ malaria_rec <-
   step_poly(age, degree = tune())
 ```
 
-Note that, above, we did not directly specify the degree of the polynomial. Let's choose the best hyperparameter using the `tune()` function.
+Note that, above, we did not directly specify the degree of the polynomial. We will indicate that this hyperparameter needs to be tuned by using the `tune()` function.
 
-With the recipe defined, let's aggregate the information:
+With the recipe defined, let's aggregate the information in a workflow:
 
 
 ```{r}
-logregpol_wf <- workflow(malaria_rec, logistic_reg())
+logregpol_wf <- workflow(malaria_rec, logreg_spec)
 logregpol_wf
 ```
 
-The `tune_grid()` function calculates a set of metrics using cross-validation to evaluate performance on a pre-determined set of hyperparameters of a model or recipe:
+We we use the `tune_grid()` function, which calculates a set of metrics using cross-validation to evaluate performance on a pre-determined set (grid) of hyperparameters of a mode or recipe:
 
 
 ```{r}
-set.seed(123)
-logregpol_res <- tune_grid(logregpol_wf, malaria_folds, grid = tibble(degree=1:6))
+logregpol_res <- tune_grid(logregpol_wf, 
+                           malaria_folds, 
+                           grid = tibble(degree=1:6))
 logregpol_res
 ```
+
+
 
 Presenting the results (average of the 5 *folds*) for each degree of polynomial (the tuning parameter/hyperparameter) considered:
 
@@ -682,11 +701,13 @@ autoplot(logregpol_res, metric = "accuracy")
 
 Showing the 3 best results:
 ```{r}
-show_best(logregpol_res, metric = "accuracy", n = 3)
+show_best(logregpol_res, 
+          metric = "accuracy", 
+          n = 3)
 ```
 
 
-What if we fit another model, also with some other hyperparameter? How to compare?
+What if we fit another model, also with some other hyperparameter to be tuned? How to compare?
 
 
 ## Decision Tree
@@ -704,22 +725,15 @@ tree_spec <-
   set_engine("rpart")
 ```
 
-The recipe is defined:
-```{r}
-rec_simple <- 
-  recipe(severity ~ ., data = malaria_train)
-```
-
 
 The *workflow*:
 ```{r}
-tree_wf <- workflow(rec_simple, tree_spec) 
+tree_wf <- workflow(severity ~ ., tree_spec) 
 ```
 
 Let's use `tune_grid()` to evaluate multiple values for the hyperparameter:
 
-```{r tree-tune}
-set.seed(9)
+```{r}
 tree_res <-
   tune_grid(tree_wf, 
             resamples = malaria_folds, 
@@ -735,14 +749,13 @@ Metrics obtained through cross-validation considering the `grid` values:
 tree_res %>% collect_metrics()
 ```
 
-
 ```{r}
 autoplot(tree_res)
 ```
 
 
 
-The best result from cross validation, considering accuracy metric:
+The best result from cross-validation, considering accuracy metric:
 ```{r}
 show_best(tree_res, metric = "accuracy", n = 1)
 ```
@@ -751,22 +764,25 @@ show_best(tree_res, metric = "accuracy", n = 1)
 ## Random Forest
 
 
-There is a tuning parameter that is commonly chosen for random forest models.
+A tuning parameter that is commonly chosen for random forest models is `mtry`, which is the number of predictors that will be randomly sampled at each split when creating the tree models. 
 
-`mtry` is the number of predictors that will be randomly sampled at each split when creating the tree models. For the `ranger` engine, the [default](https://parsnip.tidymodels.org/reference/details_rand_forest_ranger.html) it `floor(sqrt(ncol(x)))`.
+For the `ranger` engine, the [default](https://parsnip.tidymodels.org/reference/details_rand_forest_ranger.html) it `floor(sqrt(ncol(x)))`.
 
-Let's use cross validation to tune this parameter.
+Let's use cross-validation to tune this parameter.
 
 We start by specifying the model and including `tune()`:
 
 ```{r}
 rf_spec <- rand_forest(trees = 1000,
                        mtry = tune()) %>%
-    set_mode("classification")
+    set_mode("classification") %>% 
+    set_engine("ranger", importance = "impurity")
 rf_spec
 ```
 
-A workflow with a formula:
+Here, we used `set_engine` and added the argument `importance = "impurity"`, so we can have variable importance scores to help us have some insight into which predictors drive model performance.
+
+The workflow:
 
 ```{r}
 rf_wf <- workflow(severity ~ ., rf_spec)
@@ -774,10 +790,10 @@ rf_wf
 ```
 
 
-Let's use `tune_grid()` to evaluate multiple values for the hyperparameter:
+Let's use `tune_grid()` to evaluate the performance for multiple values of the hyperparameter using cross-validation:
 
-```{r rf-tune}
-set.seed(9)
+```{r}
+set.seed(2024)
 rf_res <-
   tune_grid(rf_wf, 
             resamples = malaria_folds, 
@@ -798,7 +814,7 @@ autoplot(rf_res)
 ```
 
 
-The best result from cross validation, considering accuracy metric:
+The best result from cross-validation, considering accuracy metric:
 ```{r}
 show_best(rf_res, metric = "accuracy", n = 1)
 ```
@@ -813,23 +829,22 @@ We can define a set of workflows and then evaluate it using `tune_grid`.
 wf_tune_set <- workflow_set(preproc = list(rec1 = severity ~ ., 
                                            rec2 = malaria_rec,
                                            rec1 = severity ~ .),
-                       models = list(tree = tree_spec, 
-                                     logreg = logreg_spec, 
-                                     rf = rf_spec),
-                       cross = FALSE)
+                            models = list(tree = tree_spec, 
+                                          logreg = logreg_spec, 
+                                          rf = rf_spec),
+                            cross = FALSE)
 ```
 
 
 ```{r}
+set.seed(2024)
 wf_tune_res <-  wf_tune_set %>% workflow_map(resamples = malaria_folds, 
-                             grid = 20,
-                             control = control_grid(save_pred = TRUE))
+                                             grid = 40,
+                                             metrics = malaria_metrics,
+                                             control = control_grid(save_pred = TRUE))
 ```
 
 
-FAZER
-
-https://www.tmwr.org/workflow-sets
 
 ```{r}
 tune_results <- wf_tune_res %>% 
@@ -837,7 +852,7 @@ tune_results <- wf_tune_res %>%
 tune_results
 ```
 
-
+Let's select the best performing workflow, considering the accuracy:
 ```{r}
 best_wf_id <- wf_tune_res %>% 
   rank_results() %>% 
@@ -845,70 +860,45 @@ best_wf_id <- wf_tune_res %>%
   arrange(desc(mean)) %>%
   slice(1) %>%  # Select the best one
   pull(wflow_id)
+
 best_wf_id
 ```
 
+
+Then, we can extract the best workflow as follows:
 ```{r}
-# Step 2: Extract the best workflow
 best_workflow <- wf_tune_set %>%
   extract_workflow(best_wf_id)
+```
 
-# Finalize the workflow with the best hyperparameters
+To finalize the selected workflow fixing the hyperparameter with best performance:
+```{r}
 best_workflow_final <- best_workflow %>%
   finalize_workflow(
     wf_tune_res %>%
       extract_workflow_set_result(best_wf_id) %>%
       select_best(metric = "accuracy")
   )
-
+best_workflow_final
 ```
 
 
 ```{r}
 final_res <-
   best_workflow_final %>%
-  last_fit(malaria_split)
+  last_fit(malaria_split,
+           metrics = malaria_metrics)
 final_res
 ```
 
-
-
-
-
-And the best result for polynomial logistic regression, according to cross validation:
-
-```{r}
-tree_res %>% 
-  show_best(metric = "accuracy", n = 1) %>% 
-  select(.metric, .estimator, mean, n, std_err, .config)
-```
-
-Let's assume, for instance, that between the two options (polynomial logistic regression and tree), we will stick with polynomial logistic regression. Let's select the model with the best performing hyperparameter:
-
-```{r}
-best_acc <- select_best(logregpol_res, metric = "accuracy")
-best_acc
-```
-
-And adjusting the final model:
-
-
-```{r}
-final_res <-
-  logregpol_wf %>% 
-  finalize_workflow(best_acc) %>%
-  last_fit(malaria_split)
-final_res
-```
-
-
-`last_fit()` fits the final model with the training data and evaluates the performance on the test data.
 
 Results on test set:
 
-```{r test-res}
+```{r }
 final_res %>% collect_metrics()
 ```
+
+
 
 
 For the selected final *workflow*, we save all final adjustment steps (obtained using the training set):
@@ -927,10 +917,83 @@ Final *workflow*:
 
 
 ```{r}
-final_res %>% 
-  extract_fit_parsnip() %>%
-  tidy()
+fitted_wf %>% 
+  extract_fit_parsnip() 
 ```
+
+
+
+```{r}
+library(vip)
+final_res %>% 
+  extract_fit_parsnip() %>% 
+  vip(num_features = 10)
+```
+
+
+<!-- FAZER -->
+
+<!-- https://www.tmwr.org/workflow-sets -->
+
+<!-- https://www.tidymodels.org/start/case-study/ -->
+
+
+<!-- And the best result for polynomial logistic regression, according to cross-validation: -->
+
+<!-- ```{r} -->
+<!-- tree_res %>%  -->
+<!--   show_best(metric = "accuracy", n = 1) %>%  -->
+<!--   select(.metric, .estimator, mean, n, std_err, .config) -->
+<!-- ``` -->
+
+<!-- Let's assume, for instance, that between the two options (polynomial logistic regression and tree), we will stick with polynomial logistic regression. Let's select the model with the best performing hyperparameter: -->
+
+<!-- ```{r} -->
+<!-- best_acc <- select_best(logregpol_res, metric = "accuracy") -->
+<!-- best_acc -->
+<!-- ``` -->
+
+<!-- And adjusting the final model: -->
+
+
+<!-- ```{r} -->
+<!-- final_res <- -->
+<!--   logregpol_wf %>%  -->
+<!--   finalize_workflow(best_acc) %>% -->
+<!--   last_fit(malaria_split) -->
+<!-- final_res -->
+<!-- ``` -->
+
+
+<!-- `last_fit()` fits the final model with the training data and evaluates the performance on the test data. -->
+
+<!-- Results on test set: -->
+
+<!-- ```{r test-res} -->
+<!-- final_res %>% collect_metrics() -->
+<!-- ``` -->
+
+
+<!-- For the selected final *workflow*, we save all final adjustment steps (obtained using the training set): -->
+
+<!-- ```{r} -->
+<!-- fitted_wf <- extract_workflow(final_res) -->
+<!-- fitted_wf -->
+<!-- ``` -->
+
+<!-- Get predicted values: -->
+<!-- ```{r} -->
+<!-- predict(fitted_wf, malaria_test[1:3,]) -->
+<!-- ``` -->
+
+<!-- Final *workflow*: -->
+
+
+<!-- ```{r} -->
+<!-- final_res %>%  -->
+<!--   extract_fit_parsnip() %>% -->
+<!--   tidy() -->
+<!-- ``` -->
 
 # References
 
