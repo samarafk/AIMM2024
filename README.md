@@ -6,4 +6,4 @@ Event website: <https://sally.ufba.br/AIMM2024.html>
 
 Web version:
 
-<https://samarafk.github.io/aimm2024/>
+<https://samarafk.github.io/AIMM2024/>
