@@ -117,14 +117,14 @@ malaria_train %>%
 
 ```
 
-A amostragem estratificada é feita através do argumento `strata`. A estratificação garante que os dados de teste mantenham uma distribuição próxima a dos dados de treinamento.
+Stratified sampling is done through the `strata` argument. Stratification ensures that the test data maintains a distribution close to that of the training data.
 
-Como a separação em treinamento e teste é feita de forma aleatorizada é importante usar `set.seed()` para garantirmos sempre a mesma divisão dos dados ao executarmos o código novamente:
-
-
+As the separation between training and testing is done randomly, it is important to use `set.seed()` to always guarantee the same division of data when executing the code again:
 
 
-Mais detalhes sobre divisão do conjunto de dados em treinamento e teste são discutidos nos livros de @hastie01statisticallearning e @James2013.
+
+
+More details about splitting the dataset into training and testing are discussed in the books by @hastie01statisticallearning and @James2013.
 
 
 # Model
