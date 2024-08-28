@@ -783,7 +783,7 @@ show_best(tree_res, metric = "accuracy", n = 1)
 
 A tuning parameter that is commonly chosen for random forest models is `mtry`, which is the number of predictors that will be randomly sampled at each split when creating the tree models. 
 
-For the `ranger` engine, the [default](https://parsnip.tidymodels.org/reference/details_rand_forest_ranger.html) it `floor(sqrt(ncol(x)))`.
+For the `ranger` engine, the [default](https://parsnip.tidymodels.org/reference/details_rand_forest_ranger.html) is `floor(sqrt(ncol(x)))`.
 
 Let's use cross-validation to tune this parameter.
 
@@ -829,7 +829,7 @@ autoplot(rf_res)
 ```
 
 
-The best result from cross-validation, considering accuracy metric:
+The best result from cross-validation, considering the accuracy metric:
 ```{r}
 show_best(rf_res, metric = "accuracy", n = 1)
 ```
@@ -849,10 +849,10 @@ We then need to select the model with the best performing hyperparameter, we do 
 To adjust the final model, we take the desired workflow (`logregpol_wf` in this example) and use the function `finalize_workflow()` to specify the best performing hyperparameter. The function `last_fit()` fits this final model with the training data and evaluates the performance on the test data.
 
 ```{r}
-final_tree_fit <- logregpol_wf %>% 
+final_log_fit <- logregpol_wf %>% 
    finalize_workflow(best_acc) %>%
    last_fit(malaria_split)
-final_tree_fit
+final_log_fit
 ```
 
 
@@ -860,7 +860,7 @@ final_tree_fit
 Results on test set:
 
 ```{r}
-final_tree_fit %>% collect_metrics()
+final_log_fit %>% collect_metrics()
 ```
 
 
@@ -868,7 +868,7 @@ final_tree_fit %>% collect_metrics()
 For the selected final *workflow*, we can save all final adjustment steps (obtained using the training set):
 
 ```{r}
-fitted_wf <- extract_workflow(final_tree_fit)
+fitted_wf <- extract_workflow(final_log_fit)
 fitted_wf
 ```
 
@@ -889,7 +889,7 @@ fitted_wf %>%
 
 
 ```{r}
-final_tree_fit %>%
+final_log_fit %>%
   extract_fit_engine() %>%
   tidy(conf.int = TRUE) %>% 
   kable(booktabs = TRUE)
