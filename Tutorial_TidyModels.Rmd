@@ -726,6 +726,57 @@ show_best(logregpol_res,
 
 What if we fit another model, also with some other hyperparameter to be tuned? How to compare?
 
+## LASSO
+
+We can fit a logistic regression using lasso regularization:
+
+
+```{r}
+logreglasso_spec <- logistic_reg(penalty = tune(), mixture = 1) %>%
+  set_engine("glmnet", family = "binomial") %>%
+  set_mode("classification")
+```
+
+`mixture = 1` specifies a pure lasso model and the `penalty` hyperparameter will be tuned using cross-validation.
+
+
+We will not consider the polynomial for `age` in this workflow, so we can set it up directly with the formula and the specified model:
+
+
+```{r}
+logreglasso_wf <- workflow(severity ~ ., logreglasso_spec)
+logreglasso_wf
+```
+
+
+To evaluate the performance for multiple values of the hyperparameter using cross-validation:
+
+```{r}
+set.seed(2024)
+logreglasso_res <-
+  tune_grid(logreglasso_wf, 
+            resamples = malaria_folds, 
+            grid = 20,
+            metrics = malaria_metrics)
+```
+
+
+Resulting metrics from cross-validation considering the grid values:
+
+```{r}
+logreglasso_res %>% collect_metrics()
+```
+
+
+```{r}
+autoplot(logreglasso_res)
+```
+
+
+The best result from cross-validation, considering the accuracy metric:
+```{r}
+show_best(logreglasso_res, metric = "accuracy", n = 1)
+```
 
 ## Decision Tree
 
@@ -754,7 +805,7 @@ Let's use `tune_grid()` to evaluate multiple values for the hyperparameter:
 tree_res <-
   tune_grid(tree_wf, 
             resamples = malaria_folds, 
-            grid = 15,
+            grid = 30,
             metrics = malaria_metrics)
 ```
 
@@ -837,22 +888,22 @@ show_best(rf_res, metric = "accuracy", n = 1)
 ## Fitting the chosen tuned model
 
 
-Let's assume, for instance, that between the three options (polynomial logistic regression, decision tree and random forest), we decide to use the best tuned polynomial logisitc regression. 
+Let's assume, for instance, that between the four options (polynomial logistic regression, LASSO, decision tree and random forest), we decide to use the best tuned LASSO logistic regression. 
 
 We then need to select the model with the best performing hyperparameter, we do so by using the `select_best()` function:
 
 ```{r}
- best_acc <- select_best(logregpol_res, metric = "accuracy")
+ best_acc <- select_best(logreglasso_res, metric = "accuracy")
  best_acc
 ```
 
 To adjust the final model, we take the desired workflow (`logregpol_wf` in this example) and use the function `finalize_workflow()` to specify the best performing hyperparameter. The function `last_fit()` fits this final model with the training data and evaluates the performance on the test data.
 
 ```{r}
-final_log_fit <- logregpol_wf %>% 
+final_lasso_fit <- logreglasso_wf %>% 
    finalize_workflow(best_acc) %>%
    last_fit(malaria_split)
-final_log_fit
+final_lasso_fit
 ```
 
 
@@ -860,7 +911,7 @@ final_log_fit
 Results on test set:
 
 ```{r}
-final_log_fit %>% collect_metrics()
+final_lasso_fit %>% collect_metrics()
 ```
 
 
@@ -868,7 +919,7 @@ final_log_fit %>% collect_metrics()
 For the selected final *workflow*, we can save all final adjustment steps (obtained using the training set):
 
 ```{r}
-fitted_wf <- extract_workflow(final_log_fit)
+fitted_wf <- extract_workflow(final_lasso_fit)
 fitted_wf
 ```
 
@@ -886,14 +937,16 @@ fitted_wf %>%
   metrics(truth = severity, estimate = .pred_class)
 ```
 
-
+To obtain the estimates of the model:
 
 ```{r}
-final_log_fit %>%
-  extract_fit_engine() %>%
+final_lasso_fit %>%
+  extract_fit_parsnip() %>%
   tidy(conf.int = TRUE) %>% 
   kable(booktabs = TRUE)
 ```
+
+
 
 
 ## Everything Everywhere All at Once
@@ -903,10 +956,12 @@ We can define a set of workflows and then evaluate it using `tune_grid`.
 ```{r}
 wf_tune_set <- workflow_set(preproc = list(rec1 = severity ~ ., 
                                            rec2 = malaria_rec,
+                                           rec1 = severity ~ .,
                                            rec1 = severity ~ .),
                             models = list(tree = tree_spec, 
                                           logreg = logreg_spec, 
-                                          rf = rf_spec),
+                                          rf = rf_spec,
+                                          lasso_log = logreglasso_spec),
                             cross = FALSE)
 ```
 
@@ -1007,42 +1062,6 @@ final_wf_fit %>%
   vip(num_features = 10)
 ```
 
-
-<!-- FAZER -->
-
-<!-- https://www.tmwr.org/workflow-sets -->
-
-<!-- https://www.tidymodels.org/start/case-study/ -->
-
-
-
-<!-- Results on test set: -->
-
-<!-- ```{r test-res} -->
-<!-- final_res %>% collect_metrics() -->
-<!-- ``` -->
-
-
-<!-- For the selected final *workflow*, we save all final adjustment steps (obtained using the training set): -->
-
-<!-- ```{r} -->
-<!-- fitted_wf <- extract_workflow(final_res) -->
-<!-- fitted_wf -->
-<!-- ``` -->
-
-<!-- Get predicted values: -->
-<!-- ```{r} -->
-<!-- predict(fitted_wf, malaria_test[1:3,]) -->
-<!-- ``` -->
-
-<!-- Final *workflow*: -->
-
-
-<!-- ```{r} -->
-<!-- final_res %>%  -->
-<!--   extract_fit_parsnip() %>% -->
-<!--   tidy() -->
-<!-- ``` -->
 
 # References
 
