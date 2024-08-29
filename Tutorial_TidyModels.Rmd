@@ -36,6 +36,17 @@ This document is part of the tutorial presented during the Artificial Intelligen
 Source files are available on <https://github.com/samarafk/AIMM2024>.
 
 
+The slides presented:
+
+[01- Introduction](https://drive.google.com/file/d/1A61GVdcfWuoSSZBpP3Dh2cxCHDadM7Aw/view?usp=drive_link)
+
+[02 - Tidymodels Structure](https://drive.google.com/file/d/1oupHAdI7ILNQjhv30TjL8zjluBm6Uh9b/view?usp=drive_link)
+
+[03 - Evaluating and Comparing Models](https://drive.google.com/file/d/1psdR1dYgECNz9hqUDTVGvjWZ7KUC8uqn/view?usp=drive_link)
+
+[04 - Tuning](https://drive.google.com/file/d/1qxnM2rJSkKBCHoWl4yWhjvE6wPFDd0_Y/view?usp=drive_link)
+
+
 # Dataset
 
 The dataset used in this example is available from @Adeboye2020.
