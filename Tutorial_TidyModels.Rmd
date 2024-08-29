@@ -942,7 +942,7 @@ To obtain the estimates of the model:
 ```{r}
 final_lasso_fit %>%
   extract_fit_parsnip() %>%
-  tidy(conf.int = TRUE) %>% 
+  tidy() %>% 
   kable(booktabs = TRUE)
 ```
 
