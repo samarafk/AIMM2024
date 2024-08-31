@@ -31,7 +31,7 @@ knitr::opts_chunk$set(echo = TRUE, message = FALSE)
 
 # Introduction
 
-This document is part of the tutorial presented during the Artificial Intelligence for Malaria (and Infectious Diseases) Modelling in Brazil and Latin America ([AIMM 2024](https://sally.ufba.br/AIMM2024.html)) at [IMECC, UNICAMP](https://ime.unicamp.br/).
+This is a supporting material for the tutorial presented during the Artificial Intelligence for Malaria (and Infectious Diseases) Modelling in Brazil and Latin America ([AIMM 2024](https://sally.ufba.br/AIMM2024.html)) at [IMECC, UNICAMP](https://ime.unicamp.br/).
 
 Source files are available on <https://github.com/samarafk/AIMM2024>.
 
