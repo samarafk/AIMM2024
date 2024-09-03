@@ -36,6 +36,8 @@ This is a supporting material for the tutorial presented during the Artificial I
 Source files are available on <https://github.com/samarafk/AIMM2024>.
 
 
+The video os the presentation: <https://www.youtube.com/watch?v=t75nrLtK5Oo>
+
 The slides presented:
 
 [01- Introduction](https://drive.google.com/file/d/1A61GVdcfWuoSSZBpP3Dh2cxCHDadM7Aw/view?usp=drive_link)
@@ -91,7 +93,11 @@ malaria <- malaria %>%
 
 We now load the `tidymodels` package to start our analysis. The first step is to split the data into training and testing datasets. 
 
-We use the function `initial_split()`. By default, this function splits the data so that 75\% is training and 25\% is testing.  Here, we use 80\% for training, so we specify this by setting `prop = 0.8`. We need to use `set.seed()` here, since it allows us to reproduce the results.
+We use the function `initial_split()`. By default, this function splits the data so that 75\% is training and 25\% is testing.  Here, we use 80\% for training, so we specify this by setting `prop = 0.8`.
+
+Stratified sampling is done through the `strata` argument. Stratification ensures that the test data maintains a distribution close to that of the training data.
+
+As the separation between training and testing is done randomly, it is important to use `set.seed()` to always guarantee the same division of data when executing the code again:
 
 
 ```{r}
@@ -111,7 +117,9 @@ malaria_test <- testing(malaria_split)
 
 
 
-What is the distribution of the outcome for the training and testing datasets? 
+More details about splitting the dataset into training and testing are discussed in the books by @hastie01statisticallearning and @James2013.
+
+We can perform exploratory analysis as usual in the training dataset. For instance, what is the distribution of the outcome for the training dataset? 
 
 ```{r}
 malaria_train %>% 
@@ -128,14 +136,9 @@ malaria_train %>%
 
 ```
 
-Stratified sampling is done through the `strata` argument. Stratification ensures that the test data maintains a distribution close to that of the training data.
-
-As the separation between training and testing is done randomly, it is important to use `set.seed()` to always guarantee the same division of data when executing the code again:
 
 
 
-
-More details about splitting the dataset into training and testing are discussed in the books by @hastie01statisticallearning and @James2013.
 
 
 # Model
