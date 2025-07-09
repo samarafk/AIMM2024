@@ -165,7 +165,7 @@ args(logistic_reg)
 Here we see that the *default* for `logistic_reg()` is `glm` (generalized linear models), but other models are also available.
 
 
-Is we want a logistic regression model via lasso and elastic-net regularized generalized linear models:
+If we want a logistic regression model via lasso and elastic-net regularized generalized linear models:
 ```{r}
 logistic_reg() %>% 
    set_engine("glmnet") 
